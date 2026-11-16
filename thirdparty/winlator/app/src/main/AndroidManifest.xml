@@ -128,16 +128,6 @@
             android:exported="true" />
 
         <activity
-            android:name="com.winlator.cmod.XrActivity"
-            android:theme="@style/AppThemeFullscreen"
-            android:launchMode="singleTask"
-            android:resizeableActivity="false"
-            android:screenOrientation="landscape"
-            android:process=":vr_process"
-            android:configChanges="density|orientation|screenSize|keyboard|keyboardHidden|uiMode|locale|layoutDirection"
-            android:exported="true" />
-
-        <activity
             android:name="com.winlator.cmod.ControlsEditorActivity"
             android:theme="@style/AppThemeFullscreen"
             android:screenOrientation="sensorLandscape"

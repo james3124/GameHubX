@@ -252,6 +252,7 @@ public final class RuntimeAssetsActivity extends Activity {
                 if (index < 0) continue;
                 String relative = name.substring(index + prefix.length());
                 if (relative.isEmpty()) continue;
+                if (relative.startsWith("ludashisteam/")) continue;
                 if (relative.contains("..")) throw new IOException("Unsafe asset path");
                 File output = new File(runtime, relative).getCanonicalFile();
                 if (!output.toPath().startsWith(canonicalRoot.toPath())) {

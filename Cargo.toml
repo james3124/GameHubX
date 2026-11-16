@@ -7,6 +7,7 @@ members = [
     "crates/gamehubx-input",
     "crates/gamehubx-platform",
     "crates/gamehubx-runtime",
+    "crates/gamehubx-session",
     "crates/gamehubx-storage",
     "crates/gamehubx-supervisor",
 ]

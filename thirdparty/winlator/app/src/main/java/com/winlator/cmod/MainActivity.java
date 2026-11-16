@@ -167,6 +167,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         drawerLayout = findViewById(R.id.DrawerLayout);
         navigationView = findViewById(R.id.NavigationView);
         navigationView.setNavigationItemSelectedListener(this);
+        MenuItem steamItem = navigationView.getMenu().findItem(R.id.main_menu_steam);
+        if (steamItem != null) steamItem.setVisible(false);
         navigationView.setBackgroundColor(Color.parseColor("#0B0D12"));
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
 

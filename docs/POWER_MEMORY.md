@@ -14,6 +14,7 @@ blocked).
 | Diagnostics | Repaint every 1 s while the Diag screen is open |
 | Runtime install | 250 ms poll only while installing; background thread |
 | Downloads screen | 500 ms refresh/repaint only while queued/downloading; worker does network I/O |
+| Android session | `XServerDisplayActivity` runs in `:session`; Diagnostics shows app and session RSS/threads/FDs from `/proc` |
 | FPS cap | `DXVK_FRAME_RATE=<fps>` from per-game settings |
 | Memory cap | Per-game `memory_limit_mb` applied as `RLIMIT_AS` in the supervisor `pre_exec` (inherited by PRoot/Wine children) |
 | CPU affinity | Optional big-core mask computed from `/sys/.../cpufreq/cpuinfo_max_freq` (top ≥80% of fastest core); applied with `sched_setaffinity` in `pre_exec` |

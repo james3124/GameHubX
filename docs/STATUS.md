@@ -29,6 +29,22 @@ state, measurements and gaps; the target design lives in `PLAN.md`.
   first existing container. Missing setup returns an error to the Session
   screen with a Winlator Setup button. Per-game containers/settings are W4.
 - Package-spoofing builds (Ludashi/RedMagic) are explicitly not adopted.
+- Session slimming (S1) started:
+  - Winlator's `MainActivity`/`XrActivity` no longer appear as launcher icons;
+    GameHubX remains the only launcher entry.
+  - The game display runs in `android:process=":session"`; normal exit restarts
+    GameHubX and lets that process die, isolating launcher/session memory.
+  - XR/OpenXR is disabled and no longer built/loaded; Steam/store hooks are
+    skipped for plain `.exe` shortcuts.
+  - Runtime assets (imagefs/Proton/session assets) are no longer bundled:
+    Download manager or first game launch downloads them into
+    `<files>/runtime-assets`; the launcher APK was ~43.5 MB in the last green
+    build versus ~527 MB.
+  - Rust ownership migration plan: `docs/RUST_SESSION_MIGRATION.md`. R0
+    diagnostics (launcher and `:session` PID/RSS/threads/FDs) and the
+    `gamehubx-session` ownership scaffold are implemented locally.
+  - Per user instruction, these S1/R0/R1 changes are local commits only; the
+    remote stays at the last pre-plan commit until the plan is implemented.
 - GameHub Lite decompiled material stays local-only and is not redistributed.
 
 ## P0 — Foundation
@@ -365,6 +381,11 @@ Gaps:
 
 1. Run the W2/W3 CI build: NDK 29 native tree, manifest merge, fetched assets
    and the Gradle APK. Fix the first compile/merge errors.
+2. Verify S1: exactly one launcher icon, no automatic runtime download at app
+   start, first game launch/download-manager flow, dedicated `:session` process
+   exit cleanup, and no XR/Steam/store work for a plain `.exe`.
+3. Record the R0 baseline (PSS/RSS, FDs, threads, JNI refs) and 50-cycle
+   launch/exit deltas before starting the Rust session migration.
 2. On-device W2 check: open Settings → Winlator Session, finish onboarding,
    extract imagefs/Proton, create a test container, and confirm the session
    activity opens without crashing.

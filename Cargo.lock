@@ -1300,6 +1300,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "gamehubx-session"
+version = "0.1.0"
+
+[[package]]
 name = "gamehubx-storage"
 version = "0.1.0"
 dependencies = [

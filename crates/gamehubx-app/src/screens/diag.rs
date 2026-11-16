@@ -1,5 +1,8 @@
 use eframe::egui::*;
-use gamehubx_platform::{battery_level, format_bytes};
+use gamehubx_platform::{
+    battery_level, format_bytes, process_fd_count, process_rss_kb, process_threads,
+    winlator_session_pid,
+};
 use gamehubx_runtime::RuntimeLayout;
 use gamehubx_supervisor::read_pss;
 
@@ -11,6 +14,14 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
     app.bar(ui, "Diagnostics");
 
     let app_pss = read_pss(std::process::id());
+    let app_pid = std::process::id();
+    let app_threads = process_threads(app_pid);
+    let app_fds = process_fd_count(app_pid);
+    let app_rss = process_rss_kb(app_pid);
+    let winlator_pid = winlator_session_pid();
+    let winlator_rss = winlator_pid.and_then(process_rss_kb);
+    let winlator_threads = winlator_pid.and_then(process_threads);
+    let winlator_fds = winlator_pid.and_then(process_fd_count);
     let session_pid = app.session.as_ref().map(|session| session.pid());
     let session_pss = session_pid.and_then(read_pss);
     let audio_pid = app.audio_session.as_ref().map(|audio| audio.pid());
@@ -53,12 +64,47 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             ui.label(
                 RichText::new(match session_pid {
                     Some(pid) => format!(
-                        "Session PID {pid} — {}",
+                        "Rust session PID {pid} — {}",
                         session_pss
                             .map(|sample| format!("{} KB PSS", sample.total_kb))
                             .unwrap_or_else(|| "PSS unavailable".to_string())
                     ),
-                    None => "Session: not running".to_string(),
+                    None => "Rust session: not running".to_string(),
+                })
+                .size(20.0)
+                .color(DIM),
+            );
+            ui.label(
+                RichText::new(format!(
+                    "App process: PID {app_pid} · RSS {} · {} threads · {} FDs",
+                    app_rss
+                        .map(|kb| format_bytes(kb * 1024))
+                        .unwrap_or_else(|| "n/a".to_string()),
+                    app_threads
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "n/a".to_string()),
+                    app_fds
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "n/a".to_string())
+                ))
+                .size(20.0)
+                .color(DIM),
+            );
+            ui.label(
+                RichText::new(match winlator_pid {
+                    Some(pid) => format!(
+                        "Winlator :session PID {pid} · RSS {} · {} threads · {} FDs",
+                        winlator_rss
+                            .map(|kb| format_bytes(kb * 1024))
+                            .unwrap_or_else(|| "n/a".to_string()),
+                        winlator_threads
+                            .map(|value| value.to_string())
+                            .unwrap_or_else(|| "n/a".to_string()),
+                        winlator_fds
+                            .map(|value| value.to_string())
+                            .unwrap_or_else(|| "n/a".to_string())
+                    ),
+                    None => "Winlator :session: not running".to_string(),
                 })
                 .size(20.0)
                 .color(DIM),

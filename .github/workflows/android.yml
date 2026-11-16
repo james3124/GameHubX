@@ -22,7 +22,7 @@ jobs:
           targets: aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
       - name: Check backend crates
-        run: cargo check -p gamehubx-core -p gamehubx-platform -p gamehubx-storage -p gamehubx-download -p gamehubx-runtime -p gamehubx-supervisor -p gamehubx-input
+        run: cargo check -p gamehubx-core -p gamehubx-platform -p gamehubx-storage -p gamehubx-download -p gamehubx-runtime -p gamehubx-session -p gamehubx-supervisor -p gamehubx-input
       - name: Prepare native shader tools
         run: bash thirdparty/winlator/.github/scripts/prepare-native-tools.sh
       - name: Fetch Winlator launcher assets

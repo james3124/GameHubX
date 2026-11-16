@@ -5,6 +5,23 @@ own the PC session lifecycle so teardown is deterministic and leaks are
 measurable, while reusing the large C/C++ X11/runtime pieces behind a narrow ABI
 instead of rewriting them blindly.
 
+## Implementation status (local, not pushed)
+
+- S1 partially implemented locally:
+  - one launcher icon
+  - `XServerDisplayActivity` in `:session`
+  - XR/OpenXR disabled/removed from the lean build
+  - Steam native targets/menu and Steam assets removed from the lean path
+  - user-triggered runtime asset download in Downloads / first game launch
+- R0 started: Diagnostics reports launcher PID/RSS/threads/FDs and Winlator
+  `:session` PID/RSS/threads/FDs from `gamehubx/session.pid`; stale PIDs are
+  discarded.
+- R1 scaffold: `crates/gamehubx-session` provides non-cloneable
+  `SessionGuard`, `SessionRequest`, state transitions, cancellation and tests.
+- R2–R7 are not implemented.
+- Per user instruction, local commits are not pushed until the plan is
+  implemented; the remote remains at the last pre-plan commit.
+
 ## 1. Goals and non-goals
 
 Goals:

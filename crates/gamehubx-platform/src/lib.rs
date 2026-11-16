@@ -39,6 +39,43 @@ pub fn battery_level() -> Option<u8> {
         .and_then(|s| s.trim().parse().ok())
 }
 
+pub fn process_threads(pid: u32) -> Option<u64> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    parse_status_value(&status, "Threads:")
+}
+
+pub fn process_rss_kb(pid: u32) -> Option<u64> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    parse_status_value(&status, "VmRSS:")
+}
+
+pub fn process_fd_count(pid: u32) -> Option<usize> {
+    std::fs::read_dir(format!("/proc/{pid}/fd"))
+        .ok()
+        .map(|dir| dir.flatten().count())
+}
+
+pub fn winlator_session_pid() -> Option<u32> {
+    let path = data_dir().join("session.pid");
+    let pid = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| text.trim().parse::<u32>().ok())?;
+    let alive = std::path::Path::new(&format!("/proc/{pid}")).is_dir();
+    if !alive {
+        let _ = std::fs::remove_file(path);
+        return None;
+    }
+    Some(pid)
+}
+
+fn parse_status_value(status: &str, key: &str) -> Option<u64> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix(key))
+        .and_then(|value| value.split_whitespace().next())
+        .and_then(|value| value.parse().ok())
+}
+
 /// Mask of CPUs whose max frequency is at least 80% of the fastest core.
 pub fn big_core_mask() -> Option<u64> {
     let mut frequencies = Vec::new();
@@ -357,5 +394,13 @@ mod tests {
         assert_eq!(mask & (1 << 7), 1 << 7);
         assert_eq!(mask & 1, 0);
         assert_eq!(compute_big_core_mask(&[]), None);
+    }
+
+    #[test]
+    fn parses_proc_status_values() {
+        let status = "Name:\tgamehubx\nThreads:\t17\nVmRSS:\t12345 kB\n";
+        assert_eq!(parse_status_value(status, "Threads:"), Some(17));
+        assert_eq!(parse_status_value(status, "VmRSS:"), Some(12345));
+        assert_eq!(parse_status_value(status, "Missing:"), None);
     }
 }

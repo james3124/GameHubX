@@ -318,6 +318,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        writeSessionPid();
         AppUtils.hideSystemUI(this);
         AppUtils.keepScreenOn(this);
 
@@ -1024,8 +1025,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
         });
     }
 
+    private void writeSessionPid() {
+        File file = new File(getFilesDir(), "gamehubx/session.pid");
+        FileUtils.writeString(file, String.valueOf(android.os.Process.myPid()));
+    }
+
+    private void clearSessionPid() {
+        File file = new File(getFilesDir(), "gamehubx/session.pid");
+        if (!file.isFile()) return;
+        try {
+            String value = FileUtils.readString(file);
+            if (value != null && value.trim().equals(String.valueOf(android.os.Process.myPid()))) {
+                file.delete();
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     @Override
     protected void onDestroy() {
+        clearSessionPid();
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         runtimeStatusProbeStopped = true;
         if (runtimeStatusProbeThread != null) runtimeStatusProbeThread.interrupt();
