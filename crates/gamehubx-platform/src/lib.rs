@@ -203,6 +203,29 @@ pub fn system_language() -> String {
     }
 }
 
+pub fn poll_gamepad_action() -> i32 {
+    #[cfg(target_os = "android")]
+    {
+        with_activity(|env, activity| -> jni::errors::Result<i32> {
+            let value = env.call_method(
+                &activity,
+                jni::jni_str!("pollGamepadAction"),
+                jni::jni_sig!("()I"),
+                &[],
+            )?;
+            Ok(match value {
+                jni::JValueOwned::Int(code) => code,
+                _ => 0,
+            })
+        })
+        .unwrap_or(0)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        0
+    }
+}
+
 pub fn launch_winlator_game(exe: &str, name: &str) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {

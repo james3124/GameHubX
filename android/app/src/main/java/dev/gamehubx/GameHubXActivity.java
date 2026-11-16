@@ -6,12 +6,15 @@ import android.util.Log;
 
 public final class GameHubXActivity extends NativeActivity {
     private static final String TAG = "GameHubX";
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Integer> GAMEPAD_ACTIONS =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     static {
         System.loadLibrary("gamehubx_app");
     }
 
     private static native void nativeSetFilesDir(String path);
+    private static native void nativeWake();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,6 +33,18 @@ public final class GameHubXActivity extends NativeActivity {
     public void onLowMemory() {
         super.onLowMemory();
         Log.w(TAG, "onLowMemory");
+    }
+
+    @Override
+    public void onBackPressed() {
+        GAMEPAD_ACTIONS.offer(6);
+        nativeWake();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        nativeWake();
     }
 
     public boolean filesAccessGranted() {
@@ -58,32 +73,34 @@ public final class GameHubXActivity extends NativeActivity {
             return super.dispatchKeyEvent(event);
         }
 
-        int mapped;
+        int action;
         switch (event.getKeyCode()) {
             case android.view.KeyEvent.KEYCODE_BUTTON_A:
-                mapped = android.view.KeyEvent.KEYCODE_ENTER;
+                action = 5;
                 break;
             case android.view.KeyEvent.KEYCODE_BUTTON_B:
-                mapped = android.view.KeyEvent.KEYCODE_ESCAPE;
+                action = 6;
                 break;
             case android.view.KeyEvent.KEYCODE_BUTTON_Y:
-                mapped = android.view.KeyEvent.KEYCODE_Y;
+                action = 8;
                 break;
             case android.view.KeyEvent.KEYCODE_BUTTON_START:
-                mapped = android.view.KeyEvent.KEYCODE_M;
+                action = 7;
                 break;
             default:
                 return super.dispatchKeyEvent(event);
         }
+        if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                && event.getRepeatCount() == 0) {
+            GAMEPAD_ACTIONS.offer(action);
+            nativeWake();
+        }
+        return true;
+    }
 
-        android.view.KeyEvent translated = new android.view.KeyEvent(
-                event.getDownTime(),
-                event.getEventTime(),
-                event.getAction(),
-                mapped,
-                event.getRepeatCount());
-        translated.setSource(source);
-        return super.dispatchKeyEvent(translated);
+    public int pollGamepadAction() {
+        Integer action = GAMEPAD_ACTIONS.poll();
+        return action == null ? 0 : action;
     }
 
     public String systemLanguage() {

@@ -27,6 +27,15 @@ pub fn run() -> eframe::Result<()> {
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_gamehubx_GameHubXActivity_nativeWake(
+    _env: *mut jni::sys::JNIEnv,
+    _class: jni::sys::jclass,
+) {
+    app::wake_ui();
+}
+
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
     android_logger::init_once(
         android_logger::Config::default().with_max_level(log::LevelFilter::Info),

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use eframe::egui::*;
@@ -27,6 +28,19 @@ use crate::widgets::*;
 
 const DESIGN_W: f32 = 1612.0;
 const DESIGN_H: f32 = 720.0;
+
+static UI_CONTEXT: OnceLock<Context> = OnceLock::new();
+
+pub(crate) fn set_ui_context(ctx: &Context) {
+    let _ = UI_CONTEXT.set(ctx.clone());
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn wake_ui() {
+    if let Some(ctx) = UI_CONTEXT.get() {
+        ctx.request_repaint();
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum S {
@@ -68,6 +82,7 @@ pub struct App {
     pub(crate) store_error: Option<String>,
     pub(crate) files_access: bool,
     pub(crate) files_access_error: Option<String>,
+    pub(crate) files_access_at: Instant,
     pub(crate) storage: Option<StorageStats>,
     pub(crate) storage_at: Instant,
     pub(crate) session: Option<RunningSession>,
@@ -214,6 +229,7 @@ fn fit_design(ctx: &Context) {
 
 impl App {
     pub fn new(ctx: &Context) -> Self {
+        set_ui_context(ctx);
         let path = files_root();
         let ents = list(&path);
         let data = data_dir();
@@ -294,6 +310,7 @@ impl App {
             store_error,
             files_access: files_access_granted(),
             files_access_error: None,
+            files_access_at: Instant::now(),
             storage,
             storage_at: Instant::now(),
             session: None,
@@ -400,7 +417,12 @@ impl App {
     }
 
     pub(crate) fn refresh_files_access(&mut self) {
+        let was_granted = self.files_access;
         self.files_access = files_access_granted();
+        self.files_access_at = Instant::now();
+        if !was_granted && self.files_access && self.s == S::Files {
+            self.nav(files_root());
+        }
     }
 
     pub(crate) fn load_current_settings(&mut self) {
@@ -868,6 +890,34 @@ impl App {
         }
     }
 
+    #[cfg(target_os = "android")]
+    fn handle_gamepad(&mut self, action: i32) {
+        match action {
+            5 => {
+                if self.s == S::Dash {
+                    match self.sel {
+                        0 => self.go(S::Pc),
+                        1 => {}
+                        n => {
+                            if n >= 2 {
+                                self.cur = n - 2;
+                                self.go(S::Detail);
+                            }
+                        }
+                    }
+                }
+            }
+            6 => self.back(),
+            7 => self.drawer = true,
+            8 => {
+                if self.s == S::Dash {
+                    self.go(S::Search);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub(crate) fn cycle_language(&mut self) {
         self.language_choice = crate::i18n::next_choice(&self.language_choice).to_string();
         crate::i18n::set_choice(&self.language_choice);
@@ -1231,10 +1281,6 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
         fit_design(ctx);
         paint_background(ctx);
-        if !ctx.input(|input| input.focused) {
-            ctx.request_repaint_after(Duration::from_secs(60));
-            return;
-        }
         let first_focus = crate::focus::take_first();
         if cfg!(target_os = "android") && ctx.memory(|memory| memory.focused().is_none()) {
             if let Some(id) = first_focus {
@@ -1245,6 +1291,16 @@ impl eframe::App for App {
         if language != self.font_lang {
             install_fonts(ctx, language == crate::i18n::Lang::ZhHans);
             self.font_lang = language;
+        }
+        if !self.files_access && self.files_access_at.elapsed() >= Duration::from_millis(500) {
+            self.refresh_files_access();
+        }
+        #[cfg(target_os = "android")]
+        {
+            let action = gamehubx_platform::poll_gamepad_action();
+            if action != 0 {
+                self.handle_gamepad(action);
+            }
         }
         self.poll_runtime_install();
         if self.s == S::Dl {
@@ -1286,11 +1342,11 @@ impl eframe::App for App {
             match self.s {
                 S::Dash => vec![
                     ("↕", "Navigate"),
-                    ("A", "Select"),
+                    ("OK", "Select"),
                     ("B", "Back"),
                     ("Y", "Search"),
                 ],
-                _ => vec![("↕", "Navigate"), ("A", "Select"), ("B", "Back")],
+                _ => vec![("↕", "Navigate"), ("OK", "Select"), ("B", "Back")],
             }
         } else {
             match self.s {

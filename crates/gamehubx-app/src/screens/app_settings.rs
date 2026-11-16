@@ -33,7 +33,16 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
                 app.cycle_language();
             }
             row(ui, "Library Database", &detail, &state);
-            row(ui, "All Files Access", "Required for import", access);
+            let access_response = row(ui, "All Files Access", "Required for import", access);
+            if access_response.clicked() {
+                app.files_access_error = None;
+                if let Err(error) = gamehubx_platform::request_files_access() {
+                    app.files_access_error = Some(error);
+                }
+            }
+            if let Some(error) = &app.files_access_error {
+                ui.label(RichText::new(error).size(16.0).color(ACC));
+            }
             if row(
                 ui,
                 "Runtime Pack",
