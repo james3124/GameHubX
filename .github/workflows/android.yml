@@ -25,7 +25,7 @@ jobs:
         run: cargo check -p gamehubx-core -p gamehubx-platform -p gamehubx-storage -p gamehubx-download -p gamehubx-runtime -p gamehubx-supervisor -p gamehubx-input
       - name: Prepare native shader tools
         run: bash thirdparty/winlator/.github/scripts/prepare-native-tools.sh
-      - name: Fetch Winlator app assets
+      - name: Fetch Winlator launcher assets
         run: |
           set -euo pipefail
           git init "$RUNNER_TEMP/winlator-assets"
@@ -34,28 +34,13 @@ jobs:
           git -C "$RUNNER_TEMP/winlator-assets" sparse-checkout init --cone
           git -C "$RUNNER_TEMP/winlator-assets" sparse-checkout set app/src/main/assets
           git -C "$RUNNER_TEMP/winlator-assets" checkout FETCH_HEAD
-          cp -a "$RUNNER_TEMP/winlator-assets/app/src/main/assets/." thirdparty/winlator/app/src/main/assets/
-      - name: Fetch Winlator runtime assets
-        run: |
-          set -euo pipefail
-          ASSETS=thirdparty/winlator/app/src/main/assets
-          mkdir -p "$ASSETS"
-          if [ ! -f "$ASSETS/imagefs.tar.zst" ]; then
-            for part in 00 01; do
-              curl --fail --location --retry 3 \
-                "https://raw.githubusercontent.com/Other-backup/winlator-imagefs-v2/main/imagefs.tar.zst.$part" \
-                -o "$ASSETS/imagefs.tar.zst.$part"
+          SRC="$RUNNER_TEMP/winlator-assets/app/src/main/assets"
+          DEST="$GITHUB_WORKSPACE/thirdparty/winlator/app/src/main/assets"
+          cd "$SRC"
+          find . -type f ! -name '*.tzst' ! -path './ludashisteam/*' -print0 |
+            while IFS= read -r -d '' file; do
+              install -D "$file" "$DEST/${file#./}"
             done
-            cat "$ASSETS/imagefs.tar.zst.00" "$ASSETS/imagefs.tar.zst.01" > "$ASSETS/imagefs.tar.zst"
-            rm -f "$ASSETS"/imagefs.tar.zst.0*
-          fi
-          PROTON="$ASSETS/proton-11.0-7-arm64ec.tar.zst"
-          if [ ! -f "$PROTON" ]; then
-            curl --fail --location --retry 3 \
-              "https://github.com/Other-backup/winlator-imagefs-v2/releases/download/pnew2/proton-wine-11.0-7-arm64ec.wcp" \
-              -o "$PROTON"
-          fi
-          echo "1ef0bb9efceb2278933b3fa2bfd374999b0d9a7c74045b67b9af8a9b5260f734  $PROTON" | sha256sum -c -
       - name: Fetch Winlator component tools
         run: |
           python3 - <<'PY'

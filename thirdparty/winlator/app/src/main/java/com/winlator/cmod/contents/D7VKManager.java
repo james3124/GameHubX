@@ -184,7 +184,7 @@ public final class D7VKManager {
 
         try {
             File canonicalRoot = destination.getCanonicalFile();
-            try (InputStream raw = context.getAssets().open(BUNDLED_ASSET);
+            try (InputStream raw = FileUtils.openAsset(context, BUNDLED_ASSET);
                  ZstdCompressorInputStream zstd = new ZstdCompressorInputStream(raw);
                  TarArchiveInputStream tar = new TarArchiveInputStream(zstd)) {
                 TarArchiveEntry entry;

@@ -128,6 +128,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         super.onCreate(savedInstanceState);
+        if (!new java.io.File(getFilesDir(), "runtime-assets/.ready").isFile()) {
+            Intent runtimeAssets = new Intent();
+            runtimeAssets.setClassName(this, "dev.gamehubx.RuntimeAssetsActivity");
+            startActivity(runtimeAssets);
+            finish();
+            return;
+        }
         com.winlator.cmod.ui.UiStrings.install(this);
         com.winlator.cmod.ui.toast.ForegroundActivityTracker.install(getApplication());
         orientationLocked = sharedPreferences.getBoolean(PREF_ORIENTATION_LOCKED, false);

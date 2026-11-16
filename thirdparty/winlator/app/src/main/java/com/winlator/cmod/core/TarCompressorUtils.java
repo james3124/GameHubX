@@ -165,7 +165,7 @@ public abstract class TarCompressorUtils {
             return D7VKManager.applyInstalled(context, D7VKManager.selectionFromAssetRequest(assetFile), destination);
         }
         try {
-            return extract(type, context.getAssets().open(assetFile), destination, onExtractFileListener);
+            return extract(type, FileUtils.openAsset(context, assetFile), destination, onExtractFileListener);
         }
         catch (IOException e) {
             return false;

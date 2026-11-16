@@ -155,6 +155,7 @@ public class AdrenotoolsManager {
     
     public boolean isFromResources(String adrenotoolsDriverId) {
         String driver = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
+        if (FileUtils.getRuntimeAsset(mContext, driver).isFile()) return true;
         AssetManager am = mContext.getResources().getAssets();
         InputStream is = null;
         boolean isFromResources = true;

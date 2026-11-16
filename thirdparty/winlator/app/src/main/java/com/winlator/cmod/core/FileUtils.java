@@ -1,7 +1,6 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
-import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -40,8 +39,20 @@ public abstract class FileUtils {
 
     private static final String TAG = "FileUtils";
 
+    public static File getRuntimeAsset(Context context, String assetFile) {
+        return new File(context.getFilesDir(), "runtime-assets/" + assetFile);
+    }
+
+    public static InputStream openAsset(Context context, String assetFile) throws IOException {
+        File runtimeAsset = getRuntimeAsset(context, assetFile);
+        if (runtimeAsset.isFile()) {
+            return new BufferedInputStream(new FileInputStream(runtimeAsset));
+        }
+        return context.getAssets().open(assetFile);
+    }
+
     public static byte[] read(Context context, String assetFile) {
-        try (InputStream inStream = context.getAssets().open(assetFile)) {
+        try (InputStream inStream = openAsset(context, assetFile)) {
             return StreamUtils.copyToByteArray(inStream);
         }
         catch (IOException e) {
@@ -244,6 +255,17 @@ public abstract class FileUtils {
     }
 
     public static void copy(Context context, String assetFile, File dstFile) {
+        File runtimeAsset = getRuntimeAsset(context, assetFile);
+        if (runtimeAsset.exists()) {
+            if (runtimeAsset.isDirectory()) {
+                copy(runtimeAsset, dstFile);
+            }
+            else {
+                if (dstFile.isDirectory()) dstFile = new File(dstFile, FileUtils.getName(assetFile));
+                copy(runtimeAsset, dstFile);
+            }
+            return;
+        }
         if (isDirectory(context, assetFile)) {
             if (!dstFile.isDirectory()) dstFile.mkdirs();
             try {
@@ -421,6 +443,8 @@ public abstract class FileUtils {
     }
 
     public static long getSize(Context context, String assetFile) {
+        File runtimeAsset = getRuntimeAsset(context, assetFile);
+        if (runtimeAsset.isFile()) return runtimeAsset.length();
         try (InputStream inStream = context.getAssets().open(assetFile)) {
             return inStream.available();
         }
@@ -438,6 +462,7 @@ public abstract class FileUtils {
     }
 
     public static boolean isDirectory(Context context, String assetFile) {
+        if (getRuntimeAsset(context, assetFile).isDirectory()) return true;
         try {
             String[] files = context.getAssets().list(assetFile);
             return files != null && files.length > 0;
@@ -475,8 +500,7 @@ public abstract class FileUtils {
     public static String readAssetsFile(Context context, String fileName) {
         try {
             String l;
-            AssetManager assetManager = context.getAssets();
-            InputStream is = assetManager.open(fileName);
+            InputStream is = openAsset(context, fileName);
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
             StringBuilder sb = new StringBuilder();

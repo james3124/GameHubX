@@ -11,7 +11,7 @@ public final class WinlatorLauncher {
 
     public static void openMain(Context context) {
         Intent intent = new Intent();
-        intent.setClassName(context, "com.winlator.cmod.MainActivity");
+        intent.setClassName(context, "dev.gamehubx.RuntimeAssetsActivity");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         new Handler(Looper.getMainLooper()).post(() -> context.startActivity(intent));
     }
