@@ -65,7 +65,7 @@ jobs:
           import urllib.request
 
           base = "https://raw.githubusercontent.com/Other-backup/winlator-imagefs-v2/ludashi-components/component-tools/arm64-v8a/"
-          dest = "thirdparty/winlator/app/src/main/jniLibs"
+          dest = "thirdparty/winlator/app/src/main/jniLibs/arm64-v8a"
           os.makedirs(dest, exist_ok=True)
           manifest = "thirdparty/winlator/app/src/main/scripts/component-tools.json"
           with open(manifest, encoding="utf-8") as handle:
