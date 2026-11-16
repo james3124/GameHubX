@@ -141,9 +141,17 @@ fn render_task(
 ) {
     ui.horizontal(|ui| {
         let subtitle = subtitle(task, speed);
-        let (rect, _) = ui.allocate_exact_size(vec2(700.0, 96.0), Sense::click());
+        let (rect, response) = ui.allocate_exact_size(vec2(700.0, 96.0), Sense::click());
         {
             let painter = ui.painter();
+            painter.rect_filled(rect, Rounding::same(14.0), CARD);
+            if response.hovered() || response.has_focus() {
+                painter.rect_stroke(
+                    rect,
+                    Rounding::same(14.0),
+                    Stroke::new(1.5_f32, Color32::from_white_alpha(160)),
+                );
+            }
             painter.text(
                 rect.left_top() + vec2(14.0, 24.0),
                 Align2::LEFT_CENTER,

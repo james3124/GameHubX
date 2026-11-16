@@ -5,6 +5,52 @@ use crate::app::{App, S};
 use crate::theme::*;
 use crate::widgets::{btn, dim};
 
+fn menu_row(ui: &mut Ui, glyph: &str, name: &str, detail: &str, selected: bool) -> Response {
+    let (rect, response) = ui.allocate_exact_size(vec2(460.0, 72.0), Sense::click());
+    crate::focus::register(response.id);
+    ui.painter().rect_filled(
+        rect,
+        Rounding::same(10.0),
+        if selected { CARD } else { CLEAR },
+    );
+    if selected {
+        ui.painter().rect_filled(
+            Rect::from_min_size(pos2(rect.left(), rect.center().y - 14.0), vec2(4.0, 28.0)),
+            2.0,
+            ACC,
+        );
+    }
+    ui.painter().text(
+        pos2(rect.left() + 24.0, rect.center().y),
+        Align2::CENTER_CENTER,
+        glyph,
+        FontId::proportional(24.0),
+        if selected { W } else { DIM },
+    );
+    ui.painter().text(
+        pos2(rect.left() + 54.0, rect.center().y - 10.0),
+        Align2::LEFT_CENTER,
+        crate::i18n::tr(name),
+        FontId::proportional(21.0),
+        W,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 54.0, rect.center().y + 15.0),
+        Align2::LEFT_CENTER,
+        crate::i18n::tr(detail),
+        FontId::proportional(14.0),
+        DIM,
+    );
+    if response.hovered() || response.has_focus() {
+        ui.painter().rect_stroke(
+            rect,
+            Rounding::same(10.0),
+            Stroke::new(1.5_f32, Color32::from_white_alpha(180)),
+        );
+    }
+    response
+}
+
 pub(crate) fn layers(app: &mut App, ctx: &Context) {
     if app.drawer || app.modal || app.popup {
         dim(ctx);
@@ -16,30 +62,53 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
             .title_bar(false)
             .frame(frame())
             .anchor(Align2::LEFT_TOP, [0.0, 0.0])
-            .fixed_size([620.0, 660.0])
+            .fixed_size([520.0, 660.0])
             .show(ctx, |ui| {
-                ui.label(RichText::new("🎮  GameHubX").size(24.0));
-                ui.add_space(20.0);
-                for (name, screen) in [
-                    ("Home", S::Dash),
-                    ("Game", S::Pc),
-                    ("Download", S::Dl),
-                    ("Setting", S::App),
+                ui.horizontal(|ui| {
+                    let (avatar, painter) = ui.allocate_painter(vec2(46.0, 46.0), Sense::hover());
+                    painter.circle_filled(avatar.rect.center(), 23.0, ACC);
+                    painter.text(
+                        avatar.rect.center(),
+                        Align2::CENTER_CENTER,
+                        "GX",
+                        FontId::proportional(16.0),
+                        W,
+                    );
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("GameHubX").size(22.0).strong());
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").size(12.0).color(GREEN));
+                            ui.label(
+                                RichText::new(crate::i18n::tr("Local library"))
+                                    .size(15.0)
+                                    .color(DIM),
+                            );
+                        });
+                    });
+                });
+                ui.add_space(22.0);
+
+                for (glyph, name, detail, screen) in [
+                    ("⌂", "Home", "Library overview", S::Dash),
+                    ("▦", "Game", "PC game library", S::Pc),
+                    ("↓", "Download", "Queue and history", S::Dl),
+                    ("⚙", "Setting", "Launcher settings", S::App),
                 ] {
                     let selected = app.s == screen;
-                    if btn(
-                        ui,
-                        name,
-                        vec2(520.0, 90.0),
-                        if selected { CARD } else { CLEAR },
-                        W,
-                        28.0,
-                    )
-                    .clicked()
-                    {
+                    let response = menu_row(ui, glyph, name, detail, selected);
+                    if response.clicked() {
                         dest = Some(screen);
                     }
                 }
+
+                ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
+                    ui.add_space(8.0);
+                    ui.label(
+                        RichText::new(crate::i18n::tr("B  Back"))
+                            .size(15.0)
+                            .color(DIM),
+                    );
+                });
             });
         if let Some(screen) = dest {
             app.drawer = false;

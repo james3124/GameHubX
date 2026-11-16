@@ -47,9 +47,7 @@ pub(crate) enum S {
 
 pub(crate) type Ent = (String, bool, usize);
 
-pub(crate) struct Tile {
-    pub(crate) ini: String,
-}
+pub(crate) struct Tile;
 
 pub struct App {
     pub(crate) s: S,
@@ -137,6 +135,34 @@ pub(crate) fn list(p: &Path) -> Vec<Ent> {
 
 fn clock() -> String {
     chrono::Local::now().format("%H:%M").to_string()
+}
+
+fn paint_background(ctx: &Context) {
+    let rect = ctx.screen_rect();
+    let painter = ctx.layer_painter(LayerId::new(Order::Background, Id::new("app-bg")));
+
+    let mut base = Mesh::default();
+    base.colored_vertex(rect.left_top(), Color32::from_rgb(53, 59, 73));
+    base.colored_vertex(rect.right_top(), Color32::from_rgb(53, 59, 73));
+    base.colored_vertex(rect.right_bottom(), BG);
+    base.colored_vertex(rect.left_bottom(), BG);
+    base.add_triangle(0, 1, 2);
+    base.add_triangle(0, 2, 3);
+    painter.add(Shape::mesh(base));
+
+    let fade_top = rect.bottom() - 280.0;
+    if fade_top > rect.top() {
+        let mut fade = Mesh::default();
+        let transparent = Color32::from_rgba_unmultiplied(26, 26, 26, 0);
+        let solid = Color32::from_rgb(26, 26, 26);
+        fade.colored_vertex(pos2(rect.left(), fade_top), transparent);
+        fade.colored_vertex(pos2(rect.right(), fade_top), transparent);
+        fade.colored_vertex(pos2(rect.right(), rect.bottom()), solid);
+        fade.colored_vertex(pos2(rect.left(), rect.bottom()), solid);
+        fade.add_triangle(0, 1, 2);
+        fade.add_triangle(0, 2, 3);
+        painter.add(Shape::mesh(fade));
+    }
 }
 
 fn install_fonts(ctx: &Context, chinese: bool) {
@@ -312,12 +338,10 @@ impl App {
 
     pub(crate) fn rebuild_tiles(&mut self) {
         let mut tiles = Vec::with_capacity(self.games.len() + 2);
-        tiles.push(Tile { ini: "P".into() });
-        tiles.push(Tile { ini: "S".into() });
-        for game in &self.games {
-            tiles.push(Tile {
-                ini: game.label.chars().next().unwrap_or('?').to_string(),
-            });
+        tiles.push(Tile);
+        tiles.push(Tile);
+        for _ in &self.games {
+            tiles.push(Tile);
         }
         self.tiles = tiles;
     }
@@ -1206,6 +1230,7 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
         fit_design(ctx);
+        paint_background(ctx);
         if !ctx.input(|input| input.focused) {
             ctx.request_repaint_after(Duration::from_secs(60));
             return;
@@ -1254,7 +1279,7 @@ impl eframe::App for App {
             }
         }
         CentralPanel::default()
-            .frame(Frame::none().fill(BG))
+            .frame(Frame::none().fill(Color32::TRANSPARENT))
             .show(ctx, |ui| self.screen(ui));
         overlays::layers(self, ctx);
         let hints_for: Vec<(&str, &str)> = if cfg!(target_os = "android") {

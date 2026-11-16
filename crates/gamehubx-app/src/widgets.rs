@@ -2,6 +2,102 @@ use eframe::egui::*;
 
 use crate::theme::{ACC, CARD, DIM, W};
 
+pub(crate) enum CardArt {
+    Pc,
+    Steam,
+    Initial,
+}
+
+pub(crate) fn game_card(
+    ui: &mut Ui,
+    label: &str,
+    art: CardArt,
+    fill: Color32,
+    selected: bool,
+) -> Response {
+    let label = crate::i18n::tr(label);
+    let size = vec2(210.0, 250.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    crate::focus::register(response.id);
+    let card = Rect::from_min_size(rect.min, vec2(size.x, 200.0));
+    let painter = ui.painter();
+    painter.rect_filled(card, Rounding::same(14.0), fill);
+    match art {
+        CardArt::Pc => {
+            let center = card.center();
+            for (index, color) in [
+                Color32::from_rgb(243, 83, 37),
+                Color32::from_rgb(129, 188, 6),
+                Color32::from_rgb(5, 166, 240),
+                Color32::from_rgb(255, 186, 8),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let offset = vec2(
+                    (index % 2) as f32 * 44.0 - 44.0,
+                    (index / 2) as f32 * 44.0 - 44.0,
+                );
+                painter.rect_filled(
+                    Rect::from_min_size(center + offset, vec2(40.0, 40.0)),
+                    3.0,
+                    color,
+                );
+            }
+        }
+        CardArt::Steam => {
+            painter.text(
+                card.center(),
+                Align2::CENTER_CENTER,
+                "STEAM",
+                FontId::proportional(34.0),
+                W,
+            );
+        }
+        CardArt::Initial => {
+            let initial = label
+                .chars()
+                .next()
+                .unwrap_or('?')
+                .to_uppercase()
+                .to_string();
+            painter.text(
+                card.center(),
+                Align2::CENTER_CENTER,
+                initial,
+                FontId::proportional(64.0),
+                W,
+            );
+            painter.rect_filled(
+                Rect::from_min_size(
+                    pos2(card.left() + 18.0, card.bottom() - 10.0),
+                    vec2(card.width() - 36.0, 4.0),
+                ),
+                2.0,
+                ACC,
+            );
+        }
+    }
+    let short: String = label.chars().take(22).collect();
+    painter.text(
+        pos2(rect.center().x, rect.bottom() - 22.0),
+        Align2::CENTER_CENTER,
+        short,
+        FontId::proportional(19.0),
+        if selected { W } else { DIM },
+    );
+    if selected {
+        painter.rect_stroke(card, Rounding::same(14.0), Stroke::new(2.5_f32, ACC));
+    } else if response.hovered() || response.has_focus() {
+        painter.rect_stroke(
+            card,
+            Rounding::same(14.0),
+            Stroke::new(2.0_f32, Color32::from_white_alpha(180)),
+        );
+    }
+    response
+}
+
 pub(crate) fn btn(ui: &mut Ui, t: &str, sz: Vec2, fill: Color32, fg: Color32, fs: f32) -> Response {
     let t = crate::i18n::tr(t);
     let (r, p) = ui.allocate_painter(sz, Sense::click());
