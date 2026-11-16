@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gamehubx-app",
+    "crates/gamehubx-core",
+    "crates/gamehubx-download",
+    "crates/gamehubx-input",
+    "crates/gamehubx-platform",
+    "crates/gamehubx-runtime",
+    "crates/gamehubx-storage",
+    "crates/gamehubx-supervisor",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

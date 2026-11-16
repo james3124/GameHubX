@@ -1,0 +1,12 @@
+[package]
+name = "gamehubx-storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+gamehubx-core = { path = "../gamehubx-core" }
+gamehubx-download = { path = "../gamehubx-download" }
+rusqlite = { version = "0.32", features = ["bundled"] }

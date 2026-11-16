@@ -1,0 +1,31 @@
+[package]
+name = "gamehubx-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "gamehubx"
+path = "src/main.rs"
+
+[dependencies]
+gamehubx-core = { path = "../gamehubx-core" }
+gamehubx-download = { path = "../gamehubx-download" }
+gamehubx-input = { path = "../gamehubx-input" }
+gamehubx-platform = { path = "../gamehubx-platform" }
+gamehubx-runtime = { path = "../gamehubx-runtime" }
+gamehubx-storage = { path = "../gamehubx-storage" }
+gamehubx-supervisor = { path = "../gamehubx-supervisor" }
+eframe = { version = "0.30", features = ["android-native-activity"] }
+chrono = "0.4"
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.14"
+jni = "0.22"
+winit = { version = "0.30", default-features = false }

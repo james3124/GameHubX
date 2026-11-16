@@ -1,0 +1,1 @@
+GameHubX-CJK.ttf is a subset of Noto Sans CJK SC (SIL OFL 1.1), with the internal name changed for GameHubX. Source: https://github.com/googlefonts/noto-cjk

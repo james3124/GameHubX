@@ -1,0 +1,13 @@
+pub(crate) mod app_settings;
+pub(crate) mod dashboard;
+pub(crate) mod detail;
+pub(crate) mod diag;
+pub(crate) mod downloads;
+pub(crate) mod files;
+pub(crate) mod game_settings;
+pub(crate) mod management;
+pub(crate) mod pc_library;
+pub(crate) mod runtime;
+pub(crate) mod search;
+pub(crate) mod session;
+pub(crate) mod touch;
