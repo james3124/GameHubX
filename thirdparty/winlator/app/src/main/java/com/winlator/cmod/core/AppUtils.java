@@ -71,7 +71,6 @@ public abstract class AppUtils {
     public static void restartApplication(Context context, int selectedMenuItemId) {
         // A restart exits the process without service teardown callbacks. Clear its
         // foreground notifications before launching the replacement task.
-        com.winlator.cmod.steam.SteamService.shutdown(context);
         context.stopService(new Intent(context, com.winlator.cmod.services.NotificationService.class));
         android.app.NotificationManager notifications = (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notifications != null) {

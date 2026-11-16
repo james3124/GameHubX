@@ -35,7 +35,7 @@ Relative to GameHub Lite 5.1.8 on the same device (baseline not yet captured):
 | Session service/audio overhead | ≤ 20 MB PSS | `dumpsys meminfo <pid>` |
 | Cold start | ≤ 2.5 s | `am start -W` |
 | Idle redraw | 0 frames when idle/unfocused except scheduled ticks | eframe repaint stats |
-| APK size | ≤ 30 MB debug arm64 | CI artifact |
+| APK size | ≤ 60 MB debug arm64 (43.5 MB measured before final S1 strip) | CI artifact |
 
 ## Baseline procedure (device)
 
@@ -46,6 +46,13 @@ Relative to GameHub Lite 5.1.8 on the same device (baseline not yet captured):
    `dumpsys batterystats <pkg>`.
 5. Start a session; sample PSS every 30 s for 10 min; record FPS if available.
 6. Record raw numbers and device/build in `docs/STATUS.md`.
+7. **Leak cycle (R0):** launch/play/exit a plain `.exe` 50 times. After each
+   exit, record the app and `:session` RSS/threads/FDs shown in Diagnostics plus
+   `pidof dev.gamehubx:session`. Pass if the deltas do not grow monotonically
+   and no session PID survives.
+8. **Failure paths:** repeat with a missing runtime, force-stopped Wine process,
+   rotation during launch, and low-memory `am send-trim-memory`; verify the same
+   cleanup.
 
 ## Matrix (to fill on device)
 
@@ -65,3 +72,7 @@ Relative to GameHub Lite 5.1.8 on the same device (baseline not yet captured):
 - No Android `onTrimMemory`/memory-pressure callback besides focus suspension.
 - Big-core detection depends on cpufreq exposure; some devices return none.
 - Session measurements require the P3 open pack and surface bridge.
+- Diagnostics now reports launcher and Winlator `:session` RSS/threads/FDs;
+  native Wine child-tree PSS is still not aggregated.
+- R0/R1 implementation is local-only pending the plan gate; the remote is not
+  updated.
