@@ -5,11 +5,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.StatFs;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -75,51 +72,16 @@ public final class RuntimeAssetsActivity extends Activity {
     }
 
     private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(64, 48, 64, 48);
-        root.setBackgroundColor(Color.rgb(7, 14, 32));
-
-        TextView title = new TextView(this);
-        title.setText("Winlator runtime setup");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(28);
-        title.setGravity(Gravity.CENTER);
-        root.addView(title);
-
-        status = new TextView(this);
-        status.setText("Preparing first-run download...");
-        status.setTextColor(Color.rgb(160, 170, 190));
-        status.setTextSize(18);
-        status.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        statusParams.topMargin = 24;
-        root.addView(status, statusParams);
-
-        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progressBar.setMax(100);
-        progressBar.setProgress(0);
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 24);
-        progressParams.topMargin = 24;
-        root.addView(progressBar, progressParams);
-
-        retry = new Button(this);
-        retry.setText("Retry");
-        retry.setVisibility(View.GONE);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.rgb(32, 36, 47));
+        setContentView(R.layout.activity_runtime_assets);
+        progressBar = findViewById(R.id.runtime_progress);
+        status = findViewById(R.id.runtime_status);
+        retry = findViewById(R.id.runtime_retry);
         retry.setOnClickListener(view -> {
             retry.setVisibility(View.GONE);
             startBootstrap();
         });
-        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        retryParams.topMargin = 24;
-        retryParams.gravity = Gravity.CENTER;
-        root.addView(retry, retryParams);
-
-        setContentView(root);
     }
 
     private void startBootstrap() {

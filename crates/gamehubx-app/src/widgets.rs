@@ -41,6 +41,7 @@ pub(crate) fn row(ui: &mut Ui, t: &str, d: &str, v: &str) -> Response {
     let v = crate::i18n::tr(v);
     let (r, p) = ui.allocate_painter(vec2(1000.0, 110.0), Sense::click());
     crate::focus::register(r.id);
+    p.rect_filled(r.rect, Rounding::same(14.0), CARD);
     if r.has_focus() || r.hovered() {
         p.rect_stroke(
             r.rect,
