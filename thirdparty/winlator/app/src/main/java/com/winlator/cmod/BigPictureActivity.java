@@ -312,19 +312,14 @@ public class BigPictureActivity extends AppCompatActivity {
 
         parallaxModeGroup.setOnCheckedChangeListener((group, checkedId) -> {
             String mode;
-            switch (checkedId) {
-                case R.id.rbParallaxOff:
-                    mode = "off";
-                    break;
-                case R.id.rbParallaxSlow:
-                    mode = "slow";
-                    break;
-                case R.id.rbParallaxFast:
-                    mode = "fast";
-                    break;
-                default:
-                    mode = "default";
-                    break;
+            if (checkedId == R.id.rbParallaxOff) {
+                mode = "off";
+            } else if (checkedId == R.id.rbParallaxSlow) {
+                mode = "slow";
+            } else if (checkedId == R.id.rbParallaxFast) {
+                mode = "fast";
+            } else {
+                mode = "default";
             }
             preferences.edit().putString("parallax_mode", mode).apply();
 

@@ -408,28 +408,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
 
-        switch (item.getItemId()) {
-            case R.id.main_menu_steam:
-                com.winlator.cmod.steam.SteamLibrary.showMenu(this);
-                break;
-            case R.id.main_menu_shortcuts:
-                show(new ShortcutsFragment(), false);
-                break;
-            case R.id.main_menu_containers:
-                show(new ContainersFragment(), false);
-                break;
-            case R.id.main_menu_input_controls:
-                show(InputControlsFragment.newInstance(selectedProfileId), false);
-                break;
-            case R.id.main_menu_file_manager:
-                show(new FileManagerFragment(), false);
-                break;
-            case R.id.main_menu_settings:
-                show(new SettingsFragment(), false);
-                break;
-            case R.id.main_menu_about:
-                showAboutDialog();
-                break;
+        int itemId = item.getItemId();
+        if (itemId == R.id.main_menu_steam) {
+            com.winlator.cmod.steam.SteamLibrary.showMenu(this);
+        } else if (itemId == R.id.main_menu_shortcuts) {
+            show(new ShortcutsFragment(), false);
+        } else if (itemId == R.id.main_menu_containers) {
+            show(new ContainersFragment(), false);
+        } else if (itemId == R.id.main_menu_input_controls) {
+            show(InputControlsFragment.newInstance(selectedProfileId), false);
+        } else if (itemId == R.id.main_menu_file_manager) {
+            show(new FileManagerFragment(), false);
+        } else if (itemId == R.id.main_menu_settings) {
+            show(new SettingsFragment(), false);
+        } else if (itemId == R.id.main_menu_about) {
+            showAboutDialog();
         }
         return true;
     }
