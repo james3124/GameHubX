@@ -53,7 +53,9 @@ state, measurements and gaps; the target design lives in `PLAN.md`.
     combined Wine+audio session teardown; Android audio is still Java-managed.
   - R5/R6 backends are local: bounded input router and generation-checked
     display surface ownership, with 28 session tests; not yet wired to Android.
-  - Per user instruction, these S1/R0–R6 changes are local commits only; the
+  - R7 cleanup inventory is complete (`docs/R7_SESSION_CLEANUP.md`); no
+    Winlator source has been deleted.
+  - Per user instruction, these S1/R0–R7 changes are local commits only; the
     remote stays at the last pre-plan commit until the plan is implemented.
 - GameHub Lite decompiled material stays local-only and is not redistributed.
 

@@ -53,8 +53,13 @@ instead of rewriting them blindly.
     enforces create/attach/resize/detach/destroy ordering, rejects stale
     callbacks, and destroys exactly once on Drop.
   - A mock backend validates 50 cycles; real C ABI/JNI wiring is not done.
-- R7 cleanup inventory is being prepared; no session code has been deleted.
-- R5/R6 are not wired into the Android session host yet.
+- R7 inventory complete: `docs/R7_SESSION_CLEANUP.md` lists removable and
+  retained Java/native pieces, blockers, removal order and the 200-cycle leak
+  gate. No source has been deleted.
+- Remaining work is integration, not new backend scaffolds: wire the Rust
+  SessionHost into the Android `:session`, move downloader/container creation
+  fully to Rust, and connect R3–R6 to the C ABI. R7 deletion begins only after
+  R1–R6 device gates pass.
 - Per user instruction, local commits are not pushed until the plan is
   implemented; the remote remains at the last pre-plan commit.
 
