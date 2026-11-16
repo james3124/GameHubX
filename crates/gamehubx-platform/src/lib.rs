@@ -203,6 +203,46 @@ pub fn system_language() -> String {
     }
 }
 
+pub fn runtime_assets_ready() -> bool {
+    #[cfg(target_os = "android")]
+    {
+        with_activity(|env, activity| -> jni::errors::Result<bool> {
+            let value = env.call_method(
+                &activity,
+                jni::jni_str!("runtimeAssetsReady"),
+                jni::jni_sig!("()Z"),
+                &[],
+            )?;
+            Ok(matches!(value, jni::JValueOwned::Bool(true)))
+        })
+        .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        false
+    }
+}
+
+pub fn download_runtime_assets() -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        with_activity(|env, activity| -> jni::errors::Result<()> {
+            env.call_method(
+                &activity,
+                jni::jni_str!("downloadRuntimeAssets"),
+                jni::jni_sig!("()V"),
+                &[],
+            )?;
+            Ok(())
+        })
+        .ok_or_else(|| "could not open the runtime downloader".to_string())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err("Runtime downloads are Android-only".to_string())
+    }
+}
+
 pub fn poll_gamepad_action() -> i32 {
     #[cfg(target_os = "android")]
     {

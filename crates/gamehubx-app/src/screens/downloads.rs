@@ -4,7 +4,7 @@ use gamehubx_platform::format_bytes;
 
 use crate::app::App;
 use crate::theme::{ACC, CARD, DIM, W};
-use crate::widgets::btn;
+use crate::widgets::{btn, row};
 
 #[derive(Clone, Copy)]
 enum Action {
@@ -49,6 +49,26 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.add_space(70.0);
             ui.vertical(|ui| {
+                if cfg!(target_os = "android") {
+                    let ready = gamehubx_platform::runtime_assets_ready();
+                    let value = if ready { "Open ›" } else { "Download ›" };
+                    if row(
+                        ui,
+                        "Winlator Runtime",
+                        "Imagefs, Proton and session components (about 500 MB)",
+                        value,
+                    )
+                    .clicked()
+                    {
+                        if ready {
+                            app.open_winlator();
+                        } else if let Err(error) = gamehubx_platform::download_runtime_assets() {
+                            app.download_message = Some(error);
+                        }
+                    }
+                    ui.add_space(12.0);
+                }
+
                 heading(ui, "Download Soon", queued.len());
                 if queued.is_empty() {
                     ui.label(

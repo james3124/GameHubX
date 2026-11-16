@@ -111,7 +111,13 @@ pub fn tr(text: &str) -> &str {
         "Clear Cache" => "清除缓存",
         "Clear completed" => "清除已完成",
         "Download components" => "下载组件",
-        "Downloads" => "下载",
+        "Winlator Runtime" => "Winlator 运行环境",
+        "Imagefs, Proton and session components (about 500 MB)" => {
+            "Imagefs、Proton 和会话组件（约 500 MB）"
+        }
+        "Ready ›" => "已就绪 ›",
+        "Open ›" => "打开 ›",
+        "Download ›" => "下载 ›",        "Downloads" => "下载",
         "Grant file access" => "授予文件访问",
         "Import PC games" => "导入 PC 游戏",
         "Install runtime pack" => "安装运行包",
@@ -224,7 +230,6 @@ pub fn tr(text: &str) -> &str {
         "Required for import" => "导入所需",
         "SQLite library loaded" => "游戏库已加载",
         "No library database" => "无游戏库数据库",
-        "Ready ›" => "就绪 ›",
         "Unavailable ›" => "不可用 ›",
         "Granted ›" => "已授予 ›",
         "Not granted ›" => "未授予 ›",

@@ -53,16 +53,31 @@ public final class RuntimeAssetsActivity extends Activity {
     private Button retry;
     private volatile boolean cancelled;
     private volatile boolean running;
+    private boolean launchGame;
+    private String exePath = "";
+    private String gameName = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (isReady()) {
-            openMain();
+        launchGame = getIntent().getBooleanExtra("launch_game", false);
+        exePath = getIntent().getStringExtra("exe_path");
+        gameName = getIntent().getStringExtra("game_name");
+        if (exePath == null) exePath = "";
+        if (gameName == null) gameName = "";
+        if (isReady(this)) {
+            finishReady();
             return;
         }
         buildUi();
-        startBootstrap();
+        if (getIntent().getBooleanExtra("auto_start", false)) {
+            retry.setVisibility(View.GONE);
+            startBootstrap();
+        } else {
+            status.setText("About 500 MB. Download once, then PC games can start offline.");
+            retry.setText("Download runtime");
+            retry.setVisibility(View.VISIBLE);
+        }
     }
 
     @Override
@@ -80,7 +95,11 @@ public final class RuntimeAssetsActivity extends Activity {
         retry = findViewById(R.id.runtime_retry);
         retry.setOnClickListener(view -> {
             retry.setVisibility(View.GONE);
-            startBootstrap();
+            if (isReady(this)) {
+                finishReady();
+            } else {
+                startBootstrap();
+            }
         });
     }
 
@@ -148,13 +167,14 @@ public final class RuntimeAssetsActivity extends Activity {
             publish("Runtime ready", 100);
             runOnUiThread(() -> {
                 running = false;
-                openMain();
+                finishReady();
             });
         } catch (Exception error) {
             cancelled = false;
             running = false;
             runOnUiThread(() -> {
                 status.setText("Setup failed: " + error.getMessage());
+                retry.setText("Retry");
                 retry.setVisibility(View.VISIBLE);
             });
         }
@@ -294,8 +314,25 @@ public final class RuntimeAssetsActivity extends Activity {
         return new File(getFilesDir(), RUNTIME_DIR);
     }
 
-    private boolean isReady() {
-        return new File(runtimeDir(), READY_MARKER).isFile();
+    public static boolean isReady(Context context) {
+        return new File(context.getFilesDir(), RUNTIME_DIR + "/" + READY_MARKER).isFile();
+    }
+
+    private void finishReady() {
+        if (launchGame) {
+            String error = dev.gamehubx.session.WinlatorBridge.launch(this, exePath, gameName);
+            if (error == null) {
+                finish();
+                return;
+            }
+            if (status == null) buildUi();
+            status.setText(error);
+            retry.setText("Retry launch");
+            retry.setVisibility(View.VISIBLE);
+            running = false;
+            return;
+        }
+        openMain();
     }
 
     private void publish(String message, int progress) {

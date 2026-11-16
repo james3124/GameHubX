@@ -60,7 +60,26 @@ public final class GameHubXActivity extends NativeActivity {
     }
 
     public String launchWinlator(String exePath, String gameName) {
+        if (!RuntimeAssetsActivity.isReady(this)) {
+            android.content.Intent intent = new android.content.Intent(this, RuntimeAssetsActivity.class);
+            intent.putExtra("auto_start", true);
+            intent.putExtra("launch_game", true);
+            intent.putExtra("exe_path", exePath);
+            intent.putExtra("game_name", gameName);
+            runOnUiThread(() -> startActivity(intent));
+            return null;
+        }
         return dev.gamehubx.session.WinlatorBridge.launch(this, exePath, gameName);
+    }
+
+    public boolean runtimeAssetsReady() {
+        return RuntimeAssetsActivity.isReady(this);
+    }
+
+    public void downloadRuntimeAssets() {
+        android.content.Intent intent = new android.content.Intent(this, RuntimeAssetsActivity.class);
+        intent.putExtra("auto_start", true);
+        runOnUiThread(() -> startActivity(intent));
     }
 
     @Override
