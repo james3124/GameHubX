@@ -1,6 +1,6 @@
 use eframe::egui::*;
 
-use crate::theme::{ACC, DIM, W};
+use crate::theme::{ACC, CARD, DIM, W};
 
 pub(crate) fn btn(ui: &mut Ui, t: &str, sz: Vec2, fill: Color32, fg: Color32, fs: f32) -> Response {
     let t = crate::i18n::tr(t);
