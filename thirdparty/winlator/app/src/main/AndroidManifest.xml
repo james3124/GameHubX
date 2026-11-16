@@ -119,6 +119,7 @@
 
         <activity
             android:name="com.winlator.cmod.XServerDisplayActivity"
+            android:process=":session"
             android:theme="@style/AppThemeFullscreen"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true"

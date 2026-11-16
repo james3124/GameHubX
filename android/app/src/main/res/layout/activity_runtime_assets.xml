@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="end"
-            android:text="FIRST-RUN SETUP"
+            android:text="RUNTIME SETUP"
             android:textColor="#8C94A5"
             android:textSize="13sp" />
     </LinearLayout>
@@ -55,7 +55,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="center"
-            android:text="Imagefs, Proton and session components are downloaded once, then stored privately on this device."
+            android:text="Download the Winlator runtime once. PC games can then start without bundling 500 MB inside the APK."
             android:textColor="#B7BECC"
             android:textSize="16sp" />
 

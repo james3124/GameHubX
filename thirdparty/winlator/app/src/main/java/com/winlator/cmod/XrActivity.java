@@ -132,10 +132,8 @@ public class XrActivity extends XServerDisplayActivity implements TextWatcher {
     }
 
     public static boolean isEnabled(Context context) {
-        if (context != null) {
-            isEnabled = PreferenceManager.getDefaultSharedPreferences(context).getBoolean("use_xr", true);
-        }
-        return isSupported() && isEnabled;
+        // GameHubX ships the lean PC-session path only.
+        return false;
     }
 
     public static boolean isSupported() {
