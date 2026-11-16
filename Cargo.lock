@@ -1245,6 +1245,7 @@ dependencies = [
  "gamehubx-input",
  "gamehubx-platform",
  "gamehubx-runtime",
+ "gamehubx-session",
  "gamehubx-storage",
  "gamehubx-supervisor",
  "jni",
@@ -1302,6 +1303,13 @@ dependencies = [
 [[package]]
 name = "gamehubx-session"
 version = "0.1.0"
+dependencies = [
+ "gamehubx-runtime",
+ "gamehubx-supervisor",
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "gamehubx-storage"

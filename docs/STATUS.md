@@ -43,7 +43,17 @@ state, measurements and gaps; the target design lives in `PLAN.md`.
   - Rust ownership migration plan: `docs/RUST_SESSION_MIGRATION.md`. R0
     diagnostics (launcher and `:session` PID/RSS/threads/FDs) and the
     `gamehubx-session` ownership scaffold are implemented locally.
-  - Per user instruction, these S1/R0/R1 changes are local commits only; the
+  - R2 is partial locally: Rust validates runtime assets/Proton SHA and
+    discovers/removes Winlator containers; Java still downloads/extracts assets
+    and creates containers.
+  - R3 is partial locally: Rust builds/owns a Wine command + process group
+    (`WineLaunch`/`WineProcess`) with limits and kill-on-drop; the Android
+    session still launches through Winlator Java.
+  - R4 is partial locally: Rust owns PulseAudio config/command/process and a
+    combined Wine+audio session teardown; Android audio is still Java-managed.
+  - R5/R6 backends are local: bounded input router and generation-checked
+    display surface ownership, with 28 session tests; not yet wired to Android.
+  - Per user instruction, these S1/R0–R6 changes are local commits only; the
     remote stays at the last pre-plan commit until the plan is implemented.
 - GameHub Lite decompiled material stays local-only and is not redistributed.
 

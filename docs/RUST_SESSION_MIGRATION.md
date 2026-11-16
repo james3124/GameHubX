@@ -18,7 +18,43 @@ instead of rewriting them blindly.
   discarded.
 - R1 scaffold: `crates/gamehubx-session` provides non-cloneable
   `SessionGuard`, `SessionRequest`, state transitions, cancellation and tests.
-- R2–R7 are not implemented.
+- R2 started:
+  - Rust validates runtime asset readiness and required files
+    (`.ready`, imagefs, Proton, container pattern), verifies the Proton SHA-256,
+    reads marker commit, and writes the readiness marker.
+  - Rust discovers/parses Winlator containers from
+    `imagefs/home/xuser-*/.container` and can safely remove a container.
+  - Downloads and Diagnostics use the Rust readiness/container view.
+  - Java still owns the actual asset downloader, imagefs extraction, container
+    creation and component/content managers; R2 is not complete.
+- R3 started:
+  - `WineLaunch::from_container` builds the Wine/Proton command, environment,
+    working directory, memory limit and CPU affinity from a Winlator container.
+  - `WineProcess` wraps the supervisor process group, exposes pid/wait/terminate
+    and kills the group on drop.
+  - Tests cover command construction, missing Wine, memory/affinity, and owned
+    child reaping.
+  - Java `GuestProgramLauncherComponent` still launches the Android session;
+    R3 is not wired into the session host yet.
+- R4 started:
+  - `AudioPlan` writes `default.pa`, builds the PulseAudio command/environment
+    and exposes the Pulse socket.
+  - `AudioProcess` owns the supervisor process group and kills it on drop.
+  - `SessionLaunch` combines Wine + optional audio; `SessionProcess` terminates
+    Wine first and audio afterward, including on spawn failure/drop.
+  - ALSA has no helper process. Java audio managers are still in the Android
+    session path; R4 is not wired into the host yet.
+- R5 started:
+  - `InputRouter` is a single-owner, bounded 64-event ring with touches/keys/
+    buttons/axes tracking. Focus-loss/stop emit releases, clear state, survive a
+    full queue, and stop is idempotent; Drop clears all state.
+- R6 started:
+  - `DisplayBridge` owns at most one opaque surface handle/generation,
+    enforces create/attach/resize/detach/destroy ordering, rejects stale
+    callbacks, and destroys exactly once on Drop.
+  - A mock backend validates 50 cycles; real C ABI/JNI wiring is not done.
+- R7 cleanup inventory is being prepared; no session code has been deleted.
+- R5/R6 are not wired into the Android session host yet.
 - Per user instruction, local commits are not pushed until the plan is
   implemented; the remote remains at the last pre-plan commit.
 

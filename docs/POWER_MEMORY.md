@@ -74,5 +74,7 @@ Relative to GameHub Lite 5.1.8 on the same device (baseline not yet captured):
 - Session measurements require the P3 open pack and surface bridge.
 - Diagnostics now reports launcher and Winlator `:session` RSS/threads/FDs;
   native Wine child-tree PSS is still not aggregated.
-- R0/R1 implementation is local-only pending the plan gate; the remote is not
+- Rust R2 validates Winlator runtime assets and container metadata; Java
+  downloader/extraction remains in R2 gap.
+- R0/R1/R2 implementation is local-only pending the plan gate; the remote is not
   updated.

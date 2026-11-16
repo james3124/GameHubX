@@ -4,6 +4,7 @@ use gamehubx_platform::{
     winlator_session_pid,
 };
 use gamehubx_runtime::RuntimeLayout;
+use gamehubx_session::{RuntimeAssets, WinlatorContainers};
 use gamehubx_supervisor::read_pss;
 
 use crate::app::App;
@@ -28,6 +29,10 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
     let missing = RuntimeLayout::new(app.runtime_root())
         .missing_components()
         .len();
+    let files_dir = gamehubx_platform::app_files_dir();
+    let runtime_assets = RuntimeAssets::new(files_dir.join("runtime-assets"));
+    let winlator_containers = WinlatorContainers::new(files_dir.join("imagefs"));
+    let containers = winlator_containers.list().len();
     let focused = ui.ctx().input(|input| input.focused);
     let storage = app
         .storage
@@ -135,6 +140,18 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
                     "Library: {} games  •  runtime missing: {missing}  •  files access: {}",
                     app.games.len(),
                     if app.files_access { "yes" } else { "no" }
+                ))
+                .size(20.0)
+                .color(DIM),
+            );
+            ui.label(
+                RichText::new(format!(
+                    "Winlator assets: {}  •  containers: {containers}",
+                    if runtime_assets.is_ready() {
+                        "ready".to_string()
+                    } else {
+                        format!("missing {:?}", runtime_assets.missing())
+                    }
                 ))
                 .size(20.0)
                 .color(DIM),

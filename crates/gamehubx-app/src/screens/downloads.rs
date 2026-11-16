@@ -1,6 +1,7 @@
 use eframe::egui::*;
 use gamehubx_download::{DownloadStatus, DownloadTask};
 use gamehubx_platform::format_bytes;
+use gamehubx_session::RuntimeAssets;
 
 use crate::app::App;
 use crate::theme::{ACC, CARD, DIM, W};
@@ -50,7 +51,10 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             ui.add_space(70.0);
             ui.vertical(|ui| {
                 if cfg!(target_os = "android") {
-                    let ready = gamehubx_platform::runtime_assets_ready();
+                    let ready = RuntimeAssets::new(
+                        gamehubx_platform::app_files_dir().join("runtime-assets"),
+                    )
+                    .is_ready();
                     let value = if ready { "Open ›" } else { "Download ›" };
                     if row(
                         ui,

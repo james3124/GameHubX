@@ -19,6 +19,7 @@ gamehubx-download = { path = "../gamehubx-download" }
 gamehubx-input = { path = "../gamehubx-input" }
 gamehubx-platform = { path = "../gamehubx-platform" }
 gamehubx-runtime = { path = "../gamehubx-runtime" }
+gamehubx-session = { path = "../gamehubx-session" }
 gamehubx-storage = { path = "../gamehubx-storage" }
 gamehubx-supervisor = { path = "../gamehubx-supervisor" }
 eframe = { version = "0.30", features = ["android-native-activity"] }

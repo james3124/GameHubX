@@ -8,6 +8,24 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+pub mod assets;
+pub mod audio;
+pub mod container;
+pub mod display;
+pub mod input;
+pub mod launch;
+
+pub use assets::{AssetError, RuntimeAssets};
+pub use audio::{AudioError, AudioMode, AudioPlan, AudioProcess};
+pub use container::{WinlatorContainer, WinlatorContainers};
+pub use display::{
+    DisplayBackend, DisplayBridge, DisplayError, DisplayState, Generation, NativeHandle,
+};
+pub use input::{Drain, Event, InputRouter, PushOutcome, EVENT_CAPACITY};
+pub use launch::{
+    LaunchError, SessionBuildError, SessionLaunch, SessionProcess, WineLaunch, WineProcess,
+};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionRequest {
     pub game_id: u64,

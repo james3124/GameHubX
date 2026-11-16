@@ -33,6 +33,13 @@ pub fn data_dir() -> PathBuf {
     PathBuf::from("gamehubx-data")
 }
 
+pub fn app_files_dir() -> PathBuf {
+    data_dir()
+        .parent()
+        .map(|parent| parent.to_path_buf())
+        .unwrap_or_else(data_dir)
+}
+
 pub fn battery_level() -> Option<u8> {
     std::fs::read_to_string("/sys/class/power_supply/battery/capacity")
         .ok()
