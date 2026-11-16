@@ -10,6 +10,9 @@ members = [
     "crates/gamehubx-storage",
     "crates/gamehubx-supervisor",
 ]
+exclude = [
+    "thirdparty/winlator/app/src/main/cpp/ludashi-steam-client/rust",
+]
 
 [workspace.package]
 version = "0.1.0"
