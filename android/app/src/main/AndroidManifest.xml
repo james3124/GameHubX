@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Sideload distribution: the import browser reads user-selected folders
          from shared storage. All-files access is requested at runtime in P1. -->
@@ -24,11 +25,11 @@
 
     <application
         android:allowBackup="false"
-        android:extractNativeLibs="true"
         android:label="GameHubX"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
+        tools:replace="android:label,android:roundIcon,android:theme">
 
         <activity
             android:name=".GameHubXActivity"
