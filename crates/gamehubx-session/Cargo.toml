@@ -7,6 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+gamehubx-input = { path = "../gamehubx-input" }
 gamehubx-runtime = { path = "../gamehubx-runtime" }
 gamehubx-supervisor = { path = "../gamehubx-supervisor" }
 serde.workspace = true

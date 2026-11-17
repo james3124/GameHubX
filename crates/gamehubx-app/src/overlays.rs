@@ -51,7 +51,7 @@ fn menu_row(ui: &mut Ui, glyph: &str, name: &str, detail: &str, selected: bool) 
 }
 
 pub(crate) fn layers(app: &mut App, ctx: &Context) {
-    if app.drawer || app.modal || app.popup {
+    if app.drawer || app.modal || app.popup || crate::screens::gallery::is_open() {
         dim(ctx);
     }
 
@@ -97,6 +97,18 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
                     let response = menu_row(ui, glyph, name, detail, selected);
                     if response.clicked() {
                         dest = Some(screen);
+                    }
+                }
+
+                // Deeper drawer entry: the album is a self-contained screen
+                // with no dedicated S variant, so it is toggled by its own
+                // flag and rendered as a window below.
+                {
+                    let selected = crate::screens::gallery::is_open();
+                    let response = menu_row(ui, "▧", "Album", "Covers and screenshots", selected);
+                    if response.clicked() {
+                        app.drawer = false;
+                        crate::screens::gallery::open();
                     }
                 }
 
@@ -232,6 +244,18 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
                         }
                     });
                 });
+            });
+    }
+
+    // Album window, opened from the drawer or the settings screen.
+    if crate::screens::gallery::is_open() {
+        Window::new("album")
+            .title_bar(false)
+            .frame(frame())
+            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+            .fixed_size([1100.0, 640.0])
+            .show(ctx, |ui| {
+                crate::screens::gallery::show(app, ui);
             });
     }
 }

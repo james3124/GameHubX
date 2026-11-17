@@ -289,12 +289,13 @@ fn range_value(element: &Element, x: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{builtin_profiles, Element, ElementType, Profile, Shape};
+    use crate::profile::{builtin_profiles, ButtonMode, Element, ElementType, Profile, Shape};
 
     fn element(kind: ElementType, x: f32, y: f32, bindings: &[&str]) -> Element {
         Element {
             kind,
             shape: Shape::Circle,
+            mode: ButtonMode::default(),
             bindings: bindings
                 .iter()
                 .map(|binding| (*binding).to_string())

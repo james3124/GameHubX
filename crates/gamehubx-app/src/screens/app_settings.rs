@@ -77,6 +77,9 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             {
                 app.clear_cache();
             }
+            if row(ui, "Album", "Covers and screenshots", "›").clicked() {
+                crate::screens::gallery::open();
+            }
             if let Some(notice) = &app.settings_notice {
                 ui.label(RichText::new(notice).size(18.0).color(ACC));
             }

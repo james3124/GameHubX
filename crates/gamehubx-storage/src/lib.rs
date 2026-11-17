@@ -7,6 +7,10 @@ use rusqlite::{params, Connection, OptionalExtension};
 const GAME_COLUMNS: &str =
     "id, kind, label, intro, exe_path, cover_path, container_id, favorite, created_at, last_played";
 
+const DOWNLOAD_COLUMNS: &str =
+    "id, title, url, dest, bytes_done, bytes_total, status, sha256, error, created_at, \
+     completed_at, group_id, priority, auto_unzip, silent_install, sub_files_json";
+
 pub struct LibraryStore {
     conn: Connection,
 }
@@ -83,14 +87,19 @@ impl LibraryStore {
                  sha256 TEXT,
                  error TEXT,
                  created_at INTEGER NOT NULL,
-                 completed_at INTEGER
+                 completed_at INTEGER,
+                 group_id TEXT,
+                 priority INTEGER NOT NULL DEFAULT 0,
+                 auto_unzip INTEGER NOT NULL DEFAULT 0,
+                 silent_install INTEGER NOT NULL DEFAULT 0,
+                 sub_files_json TEXT NOT NULL DEFAULT '[]'
              );
              CREATE INDEX IF NOT EXISTS downloads_status ON downloads(status, created_at);
              CREATE TABLE IF NOT EXISTS settings (
                  key TEXT PRIMARY KEY,
                  value TEXT NOT NULL
              );
-             PRAGMA user_version=5;",
+             PRAGMA user_version=6;",
         )?;
         if !has_column(&conn, "game_settings", "memory_limit_mb")? {
             conn.execute_batch(
@@ -126,6 +135,31 @@ impl LibraryStore {
                  ALTER TABLE game_settings ADD COLUMN overlay_opacity INTEGER NOT NULL DEFAULT 100;
                  ALTER TABLE game_settings ADD COLUMN rts_gestures INTEGER NOT NULL DEFAULT 0;
                  ALTER TABLE game_settings ADD COLUMN config_preset TEXT NOT NULL DEFAULT 'Balanced';",
+            )?;
+        }
+        // Download grouping / priority migration (user_version 6). Each column
+        // is guarded so an interrupted migration can safely resume.
+        if !has_column(&conn, "downloads", "group_id")? {
+            conn.execute_batch("ALTER TABLE downloads ADD COLUMN group_id TEXT;")?;
+        }
+        if !has_column(&conn, "downloads", "priority")? {
+            conn.execute_batch(
+                "ALTER TABLE downloads ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+        if !has_column(&conn, "downloads", "auto_unzip")? {
+            conn.execute_batch(
+                "ALTER TABLE downloads ADD COLUMN auto_unzip INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+        if !has_column(&conn, "downloads", "silent_install")? {
+            conn.execute_batch(
+                "ALTER TABLE downloads ADD COLUMN silent_install INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+        if !has_column(&conn, "downloads", "sub_files_json")? {
+            conn.execute_batch(
+                "ALTER TABLE downloads ADD COLUMN sub_files_json TEXT NOT NULL DEFAULT '[]';",
             )?;
         }
         Ok(Self { conn })
@@ -344,11 +378,13 @@ impl LibraryStore {
     }
 
     pub fn insert_download(&self, spec: &DownloadSpec, created_at: i64) -> rusqlite::Result<i64> {
+        let sub_files_json = serde_json::to_string(&spec.sub_files).unwrap_or_else(|_| "[]".into());
         self.conn.execute(
             "INSERT INTO downloads
                  (title, url, dest, bytes_done, bytes_total, status, sha256, error,
-                  created_at, completed_at)
-             VALUES (?1, ?2, ?3, 0, ?4, ?5, ?6, NULL, ?7, NULL)",
+                  created_at, completed_at, group_id, priority, auto_unzip, silent_install,
+                  sub_files_json)
+             VALUES (?1, ?2, ?3, 0, ?4, ?5, ?6, NULL, ?7, NULL, ?8, ?9, ?10, ?11, ?12)",
             params![
                 spec.title,
                 spec.url,
@@ -357,42 +393,94 @@ impl LibraryStore {
                 DownloadStatus::Queued.as_str(),
                 spec.sha256,
                 created_at,
+                spec.group_id,
+                spec.priority,
+                spec.auto_unzip as i64,
+                spec.silent_install as i64,
+                sub_files_json,
             ],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
 
     pub fn downloads(&self) -> rusqlite::Result<Vec<DownloadTask>> {
-        let mut statement = self.conn.prepare(
-            "SELECT id, title, url, dest, bytes_done, bytes_total, status, sha256,
-                    error, created_at, completed_at
-             FROM downloads ORDER BY created_at DESC, id DESC",
-        )?;
+        let sql =
+            format!("SELECT {DOWNLOAD_COLUMNS} FROM downloads ORDER BY created_at DESC, id DESC");
+        let mut statement = self.conn.prepare(&sql)?;
         let tasks = statement.query_map([], row_to_download)?.collect();
         tasks
     }
 
     pub fn download_by_id(&self, id: i64) -> rusqlite::Result<Option<DownloadTask>> {
-        self.conn
-            .query_row(
-                "SELECT id, title, url, dest, bytes_done, bytes_total, status, sha256,
-                        error, created_at, completed_at
-                 FROM downloads WHERE id = ?1",
-                [id],
-                row_to_download,
-            )
-            .optional()
+        let sql = format!("SELECT {DOWNLOAD_COLUMNS} FROM downloads WHERE id = ?1");
+        self.conn.query_row(&sql, [id], row_to_download).optional()
     }
 
     pub fn next_queued_download(&self) -> rusqlite::Result<Option<DownloadTask>> {
+        let sql = format!(
+            "SELECT {DOWNLOAD_COLUMNS} FROM downloads
+             WHERE status = ?1 ORDER BY created_at, id LIMIT 1"
+        );
         self.conn
-            .query_row(
-                "SELECT id, title, url, dest, bytes_done, bytes_total, status, sha256,
-                        error, created_at, completed_at
-                 FROM downloads WHERE status = ?1 ORDER BY created_at, id LIMIT 1",
-                [DownloadStatus::Queued.as_str()],
-                row_to_download,
-            )
+            .query_row(&sql, [DownloadStatus::Queued.as_str()], row_to_download)
+            .optional()
+    }
+
+    /// Returns every task that belongs to `group_id`, ordered by descending
+    /// priority and then creation time.
+    pub fn downloads_in_group(&self, group_id: &str) -> rusqlite::Result<Vec<DownloadTask>> {
+        let sql = format!(
+            "SELECT {DOWNLOAD_COLUMNS} FROM downloads
+             WHERE group_id = ?1 ORDER BY priority DESC, created_at, id"
+        );
+        let mut statement = self.conn.prepare(&sql)?;
+        let tasks = statement.query_map([group_id], row_to_download)?.collect();
+        tasks
+    }
+
+    /// Returns the sibling tasks of `parent_id`: every task in the parent's
+    /// group except the parent itself. A parent without an explicit group
+    /// uses its own id (as text) as the group key.
+    pub fn children_of(&self, parent_id: i64) -> rusqlite::Result<Vec<DownloadTask>> {
+        let parent = match self.download_by_id(parent_id)? {
+            Some(task) => task,
+            None => return Ok(Vec::new()),
+        };
+        let group = parent
+            .group_id
+            .clone()
+            .unwrap_or_else(|| parent.id.to_string());
+        let sql = format!(
+            "SELECT {DOWNLOAD_COLUMNS} FROM downloads
+             WHERE group_id = ?1 AND id != ?2
+             ORDER BY priority DESC, created_at, id"
+        );
+        let mut statement = self.conn.prepare(&sql)?;
+        let tasks = statement
+            .query_map(params![group, parent_id], row_to_download)?
+            .collect();
+        tasks
+    }
+
+    /// Updates the scheduling priority of a task. Higher values are dequeued
+    /// first by `next_queued_by_priority`.
+    pub fn set_priority(&self, id: i64, priority: i32) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "UPDATE downloads SET priority = ?1 WHERE id = ?2",
+            params![priority, id],
+        )?;
+        Ok(())
+    }
+
+    /// Returns the next queued task ordered by descending priority, then by
+    /// creation time (oldest first) as a stable tie-breaker.
+    pub fn next_queued_by_priority(&self) -> rusqlite::Result<Option<DownloadTask>> {
+        let sql = format!(
+            "SELECT {DOWNLOAD_COLUMNS} FROM downloads
+             WHERE status = ?1 ORDER BY priority DESC, created_at, id LIMIT 1"
+        );
+        self.conn
+            .query_row(&sql, [DownloadStatus::Queued.as_str()], row_to_download)
             .optional()
     }
 
@@ -508,6 +596,8 @@ impl LibraryStore {
 }
 
 fn row_to_download(row: &rusqlite::Row<'_>) -> rusqlite::Result<DownloadTask> {
+    let sub_files_json: String = row.get(15)?;
+    let sub_files = serde_json::from_str(&sub_files_json).unwrap_or_default();
     Ok(DownloadTask {
         id: row.get(0)?,
         title: row.get(1)?,
@@ -520,6 +610,11 @@ fn row_to_download(row: &rusqlite::Row<'_>) -> rusqlite::Result<DownloadTask> {
         error: row.get(8)?,
         created_at: row.get(9)?,
         completed_at: row.get(10)?,
+        group_id: row.get(11)?,
+        priority: row.get::<_, i64>(12)? as i32,
+        auto_unzip: row.get::<_, i64>(13)? != 0,
+        silent_install: row.get::<_, i64>(14)? != 0,
+        sub_files,
     })
 }
 
@@ -708,6 +803,7 @@ mod tests {
             dest: PathBuf::from("/tmp/runtime.tar.gz"),
             bytes_total: 1024,
             sha256: Some("a".repeat(64)),
+            ..Default::default()
         };
         let first = store.insert_download(&spec, 100).unwrap();
         let mut other = spec.clone();
@@ -785,6 +881,11 @@ mod tests {
             dest: PathBuf::from("/tmp/persist.tar.gz"),
             bytes_total: 4096,
             sha256: None,
+            group_id: Some("persist-group".into()),
+            priority: 4,
+            auto_unzip: true,
+            silent_install: true,
+            sub_files: vec!["one.bin".into(), "two.bin".into()],
         };
         {
             let store = LibraryStore::open(&path).unwrap();
@@ -801,9 +902,137 @@ mod tests {
             assert_eq!(downloads.len(), 1);
             assert_eq!(downloads[0].title, "Persisted download");
             assert_eq!(downloads[0].status, DownloadStatus::Queued);
+            assert_eq!(downloads[0].group_id.as_deref(), Some("persist-group"));
+            assert_eq!(downloads[0].priority, 4);
+            assert!(downloads[0].auto_unzip);
+            assert!(downloads[0].silent_install);
+            assert_eq!(downloads[0].sub_files, ["one.bin", "two.bin"]);
         }
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
         }
+    }
+
+    #[test]
+    fn migrates_downloads_columns_from_v5() {
+        let path = std::env::temp_dir().join(format!(
+            "gamehubx-migrate-{}-{}.db",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        {
+            // Simulate a pre-migration (user_version 5) database.
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "PRAGMA user_version=5;
+                 CREATE TABLE downloads (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     title TEXT NOT NULL, url TEXT NOT NULL, dest TEXT NOT NULL,
+                     bytes_done INTEGER NOT NULL DEFAULT 0,
+                     bytes_total INTEGER NOT NULL DEFAULT 0,
+                     status TEXT NOT NULL, sha256 TEXT, error TEXT,
+                     created_at INTEGER NOT NULL, completed_at INTEGER
+                 );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO downloads (title, url, dest, bytes_total, status, created_at)
+                 VALUES ('legacy', 'https://example.com/legacy', '/tmp/legacy', 10, 'queued', 1)",
+                [],
+            )
+            .unwrap();
+        }
+        {
+            let store = LibraryStore::open(&path).unwrap();
+            let legacy = store.download_by_id(1).unwrap().unwrap();
+            assert_eq!(legacy.title, "legacy");
+            assert_eq!(legacy.group_id, None);
+            assert_eq!(legacy.priority, 0);
+            assert!(!legacy.auto_unzip);
+            assert!(!legacy.silent_install);
+            assert!(legacy.sub_files.is_empty());
+
+            let spec = DownloadSpec {
+                title: "after-migration".into(),
+                url: "https://example.com/new".into(),
+                dest: PathBuf::from("/tmp/new"),
+                group_id: Some("batch".into()),
+                priority: 3,
+                auto_unzip: true,
+                silent_install: true,
+                sub_files: vec!["part1".into(), "part2".into()],
+                ..Default::default()
+            };
+            let id = store.insert_download(&spec, 2).unwrap();
+            let loaded = store.download_by_id(id).unwrap().unwrap();
+            assert_eq!(loaded.group_id.as_deref(), Some("batch"));
+            assert_eq!(loaded.priority, 3);
+            assert!(loaded.auto_unzip);
+            assert!(loaded.silent_install);
+            assert_eq!(loaded.sub_files, ["part1", "part2"]);
+        }
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+    }
+
+    #[test]
+    fn priority_and_group_queries() {
+        let store = LibraryStore::open_in_memory().unwrap();
+        let spec = |title: &str, group: Option<&str>, priority: i32| DownloadSpec {
+            title: title.into(),
+            url: format!("https://example.com/{title}"),
+            dest: PathBuf::from(format!("/tmp/{title}")),
+            group_id: group.map(str::to_string),
+            priority,
+            ..Default::default()
+        };
+        let a = store.insert_download(&spec("a", Some("g"), 1), 10).unwrap();
+        let b = store.insert_download(&spec("b", Some("g"), 5), 20).unwrap();
+        let c = store.insert_download(&spec("c", None, 9), 30).unwrap();
+
+        // Legacy FIFO queue is unchanged.
+        assert_eq!(store.next_queued_download().unwrap().unwrap().id, a);
+        // Priority queue prefers the highest priority.
+        assert_eq!(store.next_queued_by_priority().unwrap().unwrap().id, c);
+
+        let group = store.downloads_in_group("g").unwrap();
+        assert_eq!(group.len(), 2);
+        assert_eq!(group[0].id, b);
+        assert_eq!(group[1].id, a);
+
+        let children = store.children_of(a).unwrap();
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].id, b);
+        assert!(store.children_of(c).unwrap().is_empty());
+        assert!(store.children_of(9999).unwrap().is_empty());
+
+        // Equal priorities fall back to creation time (oldest first).
+        let d = store.insert_download(&spec("d", None, 9), 5).unwrap();
+        assert_eq!(store.next_queued_by_priority().unwrap().unwrap().id, d);
+
+        store.set_priority(a, 100).unwrap();
+        assert_eq!(store.download_by_id(a).unwrap().unwrap().priority, 100);
+        assert_eq!(store.next_queued_by_priority().unwrap().unwrap().id, a);
+        assert_eq!(store.next_queued_download().unwrap().unwrap().id, a);
+    }
+
+    #[test]
+    fn spec_serde_defaults_legacy_json() {
+        let old =
+            r#"{"title":"x","url":"https://e/x","dest":"/tmp/x","bytes_total":1,"sha256":null}"#;
+        let spec: DownloadSpec = serde_json::from_str(old).unwrap();
+        assert_eq!(spec.title, "x");
+        assert_eq!(spec.group_id, None);
+        assert_eq!(spec.priority, 0);
+        assert!(!spec.auto_unzip);
+        assert!(!spec.silent_install);
+        assert!(spec.sub_files.is_empty());
+        let json = serde_json::to_string(&spec).unwrap();
+        let back: DownloadSpec = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, spec);
     }
 }

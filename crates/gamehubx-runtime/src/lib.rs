@@ -1,24 +1,46 @@
 pub mod backup;
+pub mod base_container;
 pub mod component;
 pub mod container;
+pub mod emulation;
+pub mod gpu_presets;
 pub mod installer;
 pub mod layout;
 pub mod manifest;
+pub mod registry;
 pub mod session;
+pub mod tricks;
 pub mod verify;
 
 pub use backup::{backup_container, restore_container, BackupError};
+pub use base_container::{
+    base_marker_path, is_base_container, mark_base_container, patch_version_path,
+    read_patch_version, set_base_container, write_patch_version, ContainerPatchError,
+    BASE_CONTAINER_MARKER, PATCH_VERSION_FILE,
+};
 pub use component::{apply_dxvk, merge_component, remove_component, MergeError};
 pub use container::{Container, ContainerError, ContainerManager, ContainerMetadata};
+pub use emulation::{box64_env, fex_env, Box64Config, EmulationPreset, FexConfig};
+pub use gpu_presets::{
+    preset_names, recommend_for_gpu, PRESET_BALANCED, PRESET_COMPATIBILITY, PRESET_PERFORMANCE,
+};
 pub use installer::{
     install_component, installed_marker, ComponentSource, HttpSource, InstallError,
     InstalledMarker, LocalSource,
 };
 pub use layout::{is_within, RuntimeLayout};
 pub use manifest::{Component, ManifestError, RuntimeManifest};
+pub use registry::{
+    apply_reg, parse_reg, render_reg, validate_key, RegistryError, RegistryPatch, RegistryValue,
+    REG_FILENAME, REG_HEADER, REG_RELATIVE_DIR,
+};
 pub use session::{
     session_settings_json, AudioBackend, CommandSpec, DisplayPlan, SessionConfig, SessionError,
     SessionExtras, SessionPlan,
+};
+pub use tricks::{
+    add_custom_tricks, builtin_ids, builtin_tricks, clear_custom_tricks, custom_tricks,
+    register_trick, remove_custom_tricks, tricks_for,
 };
 pub use verify::{sha256_hex, verify_file, verify_reader};
 

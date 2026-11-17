@@ -224,3 +224,54 @@ pub(crate) fn dim(ctx: &Context) {
     ctx.layer_painter(LayerId::new(Order::Middle, Id::new("dim")))
         .rect_filled(ctx.screen_rect(), 0.0, Color32::from_black_alpha(150));
 }
+
+/// Pure geometry for the filled portion of a [`progress_bar`]. Kept separate
+/// so the clamping rules can be unit tested without an egui context.
+pub(crate) fn progress_rect(rect: Rect, ratio: f32) -> Rect {
+    let width = rect.width() * ratio.clamp(0.0, 1.0);
+    Rect::from_min_size(rect.min, vec2(width, rect.height()))
+}
+
+/// A rounded track with a coloured fill proportional to `ratio` (0..=1).
+pub(crate) fn progress_bar(
+    ui: &mut Ui,
+    ratio: f32,
+    width: f32,
+    height: f32,
+    fill: Color32,
+) -> Response {
+    let (rect, response) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
+    let rounding = Rounding::same(rect.height() / 2.0);
+    let painter = ui.painter();
+    painter.rect_filled(rect, rounding, Color32::from_rgb(42, 48, 66));
+    let filled = progress_rect(rect, ratio);
+    if filled.width() > 0.0 {
+        painter.rect_filled(filled, rounding, fill);
+    }
+    response
+}
+
+/// Draw a titled content block with consistent spacing between the heading
+/// and its body. The closure's value is returned untouched.
+pub(crate) fn section<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
+    ui.label(RichText::new(crate::i18n::tr(title)).size(24.0).strong());
+    ui.add_space(8.0);
+    let result = ui.vertical(add).inner;
+    ui.add_space(14.0);
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_rect_clamps_ratio() {
+        let rect = Rect::from_min_size(pos2(10.0, 20.0), vec2(100.0, 12.0));
+        assert_eq!(progress_rect(rect, -1.0).width(), 0.0);
+        assert_eq!(progress_rect(rect, 0.25).width(), 25.0);
+        assert_eq!(progress_rect(rect, 0.5).max.x, 60.0);
+        assert_eq!(progress_rect(rect, 5.0).width(), 100.0);
+        assert_eq!(progress_rect(rect, 0.0).min, rect.min);
+    }
+}

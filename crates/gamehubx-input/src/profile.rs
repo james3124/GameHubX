@@ -39,12 +39,73 @@ pub enum Shape {
     Rect,
 }
 
+/// Per-element input behaviour, mirroring the richer reference mapping modes.
+///
+/// The variant is stored on every [`Element`] and defaults to [`ButtonMode::Click`]
+/// when omitted from JSON, so existing profiles remain valid.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ButtonMode {
+    #[serde(rename = "CLICK", alias = "click")]
+    Click,
+    #[serde(rename = "HIT_CLICK", alias = "hitClick", alias = "hit_click")]
+    HitClick,
+    #[serde(rename = "SLIDE", alias = "slide")]
+    Slide,
+    #[serde(rename = "DISCRETE", alias = "discrete")]
+    Discrete,
+    #[serde(rename = "GESTURE", alias = "gesture")]
+    Gesture,
+    #[serde(rename = "MULTI_CLICK", alias = "multiClick", alias = "multi_click")]
+    MultiClick,
+    #[serde(rename = "ACCURATE", alias = "accurate")]
+    Accurate,
+    #[serde(rename = "SCRIPT", alias = "script")]
+    Script,
+    #[serde(rename = "JOYSTICK", alias = "joystick")]
+    Joystick,
+    #[serde(rename = "MOUSE_SLIDE", alias = "mouseSlide", alias = "mouse_slide")]
+    MouseSlide,
+    #[serde(rename = "WHEEL", alias = "wheel")]
+    Wheel,
+    #[serde(rename = "TEN_KEY", alias = "tenKey", alias = "ten_key")]
+    TenKey,
+}
+
+impl Default for ButtonMode {
+    fn default() -> Self {
+        ButtonMode::Click
+    }
+}
+
+impl ButtonMode {
+    /// Stable uppercase name used in profile JSON.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ButtonMode::Click => "CLICK",
+            ButtonMode::HitClick => "HIT_CLICK",
+            ButtonMode::Slide => "SLIDE",
+            ButtonMode::Discrete => "DISCRETE",
+            ButtonMode::Gesture => "GESTURE",
+            ButtonMode::MultiClick => "MULTI_CLICK",
+            ButtonMode::Accurate => "ACCURATE",
+            ButtonMode::Script => "SCRIPT",
+            ButtonMode::Joystick => "JOYSTICK",
+            ButtonMode::MouseSlide => "MOUSE_SLIDE",
+            ButtonMode::Wheel => "WHEEL",
+            ButtonMode::TenKey => "TEN_KEY",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Element {
     #[serde(rename = "type")]
     pub kind: ElementType,
     pub shape: Shape,
+    /// Input behaviour for this element. Defaults to `CLICK` for old profiles.
+    #[serde(default)]
+    pub mode: ButtonMode,
     #[serde(default)]
     pub bindings: Vec<String>,
     #[serde(default = "default_scale")]
@@ -251,6 +312,7 @@ fn element(kind: ElementType, x: f32, y: f32, scale: f32, bindings: &[&str]) -> 
     Element {
         kind,
         shape: Shape::Circle,
+        mode: ButtonMode::default(),
         bindings: bindings
             .iter()
             .map(|binding| (*binding).to_string())
@@ -354,5 +416,52 @@ mod tests {
         let profile = Profile::parse(SAMPLE).unwrap();
         let text = profile.to_json().unwrap();
         assert_eq!(Profile::parse(&text).unwrap(), profile);
+    }
+
+    #[test]
+    fn button_mode_defaults_to_click() {
+        // SAMPLE has no "mode" field: old profiles must remain valid.
+        let profile = Profile::parse(SAMPLE).unwrap();
+        assert_eq!(profile.elements[0].mode, ButtonMode::Click);
+        assert_eq!(ButtonMode::default(), ButtonMode::Click);
+    }
+
+    #[test]
+    fn button_mode_parses_all_variants() {
+        let cases = [
+            ("CLICK", ButtonMode::Click),
+            ("HIT_CLICK", ButtonMode::HitClick),
+            ("SLIDE", ButtonMode::Slide),
+            ("DISCRETE", ButtonMode::Discrete),
+            ("GESTURE", ButtonMode::Gesture),
+            ("MULTI_CLICK", ButtonMode::MultiClick),
+            ("ACCURATE", ButtonMode::Accurate),
+            ("SCRIPT", ButtonMode::Script),
+            ("JOYSTICK", ButtonMode::Joystick),
+            ("MOUSE_SLIDE", ButtonMode::MouseSlide),
+            ("WHEEL", ButtonMode::Wheel),
+            ("TEN_KEY", ButtonMode::TenKey),
+        ];
+        for (text, expected) in cases {
+            assert_eq!(
+                serde_json::from_str::<ButtonMode>(&format!("\"{text}\"")).unwrap(),
+                expected
+            );
+            assert_eq!(expected.as_str(), text);
+        }
+        // camelCase aliases are also accepted.
+        assert_eq!(
+            serde_json::from_str::<ButtonMode>("\"hitClick\"").unwrap(),
+            ButtonMode::HitClick
+        );
+    }
+
+    #[test]
+    fn button_mode_serializes_in_profile() {
+        let mut profile = Profile::parse(SAMPLE).unwrap();
+        profile.elements[0].mode = ButtonMode::Wheel;
+        let json = profile.to_json().unwrap();
+        assert!(json.contains("\"mode\": \"WHEEL\""));
+        assert_eq!(Profile::parse(&json).unwrap(), profile);
     }
 }

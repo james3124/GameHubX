@@ -1,0 +1,91 @@
+{
+  "id": 100,
+  "name": "Reference RTS Gestures",
+  "cursorSpeed": 1.2,
+  "gameId": "ref-rts",
+  "elements": [
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "MULTI_CLICK",
+      "bindings": ["MOUSE_LEFT"],
+      "scale": 1.0,
+      "x": 0.50,
+      "y": 0.50,
+      "toggleSwitch": false,
+      "text": "Select",
+      "iconId": 100,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "GESTURE",
+      "bindings": ["MOUSE_RIGHT"],
+      "scale": 1.0,
+      "x": 0.62,
+      "y": 0.50,
+      "toggleSwitch": false,
+      "text": "Command",
+      "iconId": 101,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "SQUARE",
+      "mode": "TEN_KEY",
+      "bindings": ["KEY_1", "KEY_2", "KEY_3", "KEY_4"],
+      "scale": 1.0,
+      "x": 0.20,
+      "y": 0.85,
+      "toggleSwitch": false,
+      "text": "Group keys",
+      "iconId": 102,
+      "range": null
+    },
+    {
+      "type": "TRACKPAD",
+      "shape": "RECT",
+      "mode": "MOUSE_SLIDE",
+      "bindings": ["MOUSE_MOVE", "NONE"],
+      "scale": 1.0,
+      "x": 0.50,
+      "y": 0.20,
+      "toggleSwitch": false,
+      "text": "Camera",
+      "iconId": 103,
+      "range": null
+    },
+    {
+      "type": "D_PAD",
+      "shape": "CIRCLE",
+      "mode": "DISCRETE",
+      "bindings": [
+        "KEY_UP",
+        "KEY_RIGHT",
+        "KEY_DOWN",
+        "KEY_LEFT"
+      ],
+      "scale": 0.9,
+      "x": 0.12,
+      "y": 0.30,
+      "toggleSwitch": false,
+      "text": "Edges",
+      "iconId": 104,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "ACCURATE",
+      "bindings": ["KEY_SPACE"],
+      "scale": 0.9,
+      "x": 0.88,
+      "y": 0.30,
+      "toggleSwitch": true,
+      "text": "Toggle grid",
+      "iconId": 105,
+      "range": null
+    }
+  ]
+}

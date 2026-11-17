@@ -1,0 +1,153 @@
+{
+  "id": 1,
+  "name": "Reference Gamepad",
+  "cursorSpeed": 1.0,
+  "gameId": "ref-gamepad",
+  "elements": [
+    {
+      "type": "D_PAD",
+      "shape": "CIRCLE",
+      "mode": "CLICK",
+      "bindings": [
+        "GAMEPAD_DPAD_UP",
+        "GAMEPAD_DPAD_RIGHT",
+        "GAMEPAD_DPAD_DOWN",
+        "GAMEPAD_DPAD_LEFT"
+      ],
+      "scale": 1.0,
+      "x": 0.20,
+      "y": 0.72,
+      "toggleSwitch": false,
+      "text": "DPad",
+      "iconId": 1,
+      "range": null
+    },
+    {
+      "type": "STICK",
+      "shape": "CIRCLE",
+      "mode": "JOYSTICK",
+      "bindings": [
+        "GAMEPAD_LEFT_THUMB_UP",
+        "GAMEPAD_LEFT_THUMB_RIGHT",
+        "GAMEPAD_LEFT_THUMB_DOWN",
+        "GAMEPAD_LEFT_THUMB_LEFT"
+      ],
+      "scale": 1.0,
+      "x": 0.12,
+      "y": 0.38,
+      "toggleSwitch": false,
+      "text": "Left stick",
+      "iconId": 2,
+      "range": null
+    },
+    {
+      "type": "STICK",
+      "shape": "CIRCLE",
+      "mode": "JOYSTICK",
+      "bindings": [
+        "GAMEPAD_RIGHT_THUMB_UP",
+        "GAMEPAD_RIGHT_THUMB_RIGHT",
+        "GAMEPAD_RIGHT_THUMB_DOWN",
+        "GAMEPAD_RIGHT_THUMB_LEFT"
+      ],
+      "scale": 1.0,
+      "x": 0.70,
+      "y": 0.72,
+      "toggleSwitch": false,
+      "text": "Right stick",
+      "iconId": 3,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_A"],
+      "scale": 1.0,
+      "x": 0.85,
+      "y": 0.75,
+      "toggleSwitch": false,
+      "text": "A",
+      "iconId": 10,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_B"],
+      "scale": 1.0,
+      "x": 0.90,
+      "y": 0.68,
+      "toggleSwitch": false,
+      "text": "B",
+      "iconId": 11,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_X"],
+      "scale": 1.0,
+      "x": 0.80,
+      "y": 0.68,
+      "toggleSwitch": false,
+      "text": "X",
+      "iconId": 12,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "CIRCLE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_Y"],
+      "scale": 1.0,
+      "x": 0.85,
+      "y": 0.61,
+      "toggleSwitch": false,
+      "text": "Y",
+      "iconId": 13,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "SQUARE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_L1"],
+      "scale": 1.0,
+      "x": 0.78,
+      "y": 0.12,
+      "toggleSwitch": false,
+      "text": "L1",
+      "iconId": 14,
+      "range": null
+    },
+    {
+      "type": "BUTTON",
+      "shape": "SQUARE",
+      "mode": "CLICK",
+      "bindings": ["GAMEPAD_BUTTON_R1"],
+      "scale": 1.0,
+      "x": 0.90,
+      "y": 0.12,
+      "toggleSwitch": false,
+      "text": "R1",
+      "iconId": 15,
+      "range": null
+    },
+    {
+      "type": "RANGE_BUTTON",
+      "shape": "RECT",
+      "mode": "SLIDE",
+      "bindings": ["GAMEPAD_AXIS_LEFT_X"],
+      "scale": 1.0,
+      "x": 0.30,
+      "y": 0.10,
+      "toggleSwitch": false,
+      "text": "Left trigger axis",
+      "iconId": 16,
+      "range": "0..1"
+    }
+  ]
+}

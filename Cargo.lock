@@ -1459,6 +1459,7 @@ dependencies = [
 name = "gamehubx-download"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "sha2",
  "ureq",
 ]
@@ -1499,6 +1500,7 @@ dependencies = [
 name = "gamehubx-session"
 version = "0.1.0"
 dependencies = [
+ "gamehubx-input",
  "gamehubx-runtime",
  "gamehubx-supervisor",
  "serde",

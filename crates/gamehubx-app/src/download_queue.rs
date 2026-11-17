@@ -98,6 +98,7 @@ fn run(
                 dest: task.dest.clone(),
                 bytes_total: task.bytes_total,
                 sha256: task.sha256.clone(),
+                ..Default::default()
             };
             let mut last_update = Instant::now();
             let result = download(&spec, &cancel, |done, total| {

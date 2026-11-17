@@ -289,6 +289,27 @@ pub fn tr(text: &str) -> &str {
         }
         "No touch profile loaded" => "未加载触控配置",
         "Memory" => "内存",
+        // Album / gallery screen.
+        "Album" => "相册",
+        "Covers" => "封面",
+        "Screenshots" => "截图",
+        "No images yet" => "暂无图片",
+        "Covers and screenshots" => "封面与截图",
+        // In-game HUD overlay.
+        "GameHubX HUD" => "GameHubX 性能面板",
+        "FPS cap" => "帧率上限",
+        "PSS --" => "PSS 不可用",
+        "Battery" => "电池",
+        // Session readouts.
+        "Audio PID" => "音频进程 ID",
+        "Containers" => "容器",
+        "PSS history" => "PSS 历史",
+        // Storage per-folder breakdown.
+        "Per-folder breakdown" => "各文件夹明细",
+        "Folder" => "文件夹",
+        "Size" => "大小",
+        "Files" => "文件数",
+        "No folders found" => "未找到文件夹",
         _ => text,
     }
 }
@@ -301,6 +322,8 @@ mod tests {
     fn translates_and_falls_back() {
         set_choice("zh-Hans");
         assert_eq!(tr("Dashboard"), "主页");
+        assert_eq!(tr("Album"), "相册");
+        assert_eq!(tr("Per-folder breakdown"), "各文件夹明细");
         assert_eq!(tr("Not a translated game"), "Not a translated game");
         set_choice("en");
         assert_eq!(tr("Dashboard"), "Dashboard");

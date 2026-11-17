@@ -1610,6 +1610,7 @@ impl App {
                 dest,
                 bytes_total: component.size_bytes,
                 sha256: Some(component.sha256.clone()),
+                ..Default::default()
             };
             match self.queue_download(spec) {
                 Ok(_) => queued += 1,
@@ -1848,6 +1849,9 @@ impl eframe::App for App {
             .frame(Frame::none().fill(Color32::TRANSPARENT))
             .show(ctx, |ui| self.screen(ui));
         overlays::layers(self, ctx);
+        // In-session HUD overlay (self-gating: only draws when a session/PSS is
+        // present and overlay_opacity > 0).
+        crate::screens::hud::draw(self, ctx);
         let hints_for: Vec<(&str, &str)> = if cfg!(target_os = "android") {
             match self.s {
                 S::Dash => vec![
