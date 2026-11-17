@@ -1868,3 +1868,37 @@ impl eframe::App for App {
         hints(ctx, &hints_for);
     }
 }
+
+#[cfg(test)]
+mod render_probe_tests {
+    use super::*;
+
+    /// Drive the real dashboard through an egui frame and assert it emits
+    /// draw commands. Guards against a blank screen from a regression in the
+    /// screen dispatcher / scaling / widget layout.
+    #[test]
+    fn dashboard_emits_draw_commands() {
+        let ctx = Context::default();
+        let input = RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(DESIGN_W, DESIGN_H))),
+            ..Default::default()
+        };
+        let mut app = App::new(&ctx);
+        let full = ctx.run(input, |ctx| {
+            CentralPanel::default()
+                .frame(Frame::none().fill(Color32::TRANSPARENT))
+                .show(ctx, |ui| app.screen(ui));
+        });
+        let shapes = full.shapes.len();
+        assert!(
+            shapes > 20,
+            "dashboard produced only {shapes} clipped shapes — likely blank"
+        );
+        // At least one glyph run (text) must be present.
+        let has_text = full
+            .shapes
+            .iter()
+            .any(|cs| matches!(cs.shape, Shape::Text(_)));
+        assert!(has_text, "dashboard produced no text shapes — likely blank");
+    }
+}

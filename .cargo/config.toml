@@ -1,0 +1,3 @@
+# Limit build parallelism to keep memory usage low.
+[build]
+jobs = 2
