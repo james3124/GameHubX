@@ -68,4 +68,6 @@ android {
 
 dependencies {
     implementation(project(":session"))
+    // HomeShortcut uses androidx.core ShortcutInfoCompat/ShortcutManagerCompat.
+    implementation("androidx.core:core:1.13.1")
 }

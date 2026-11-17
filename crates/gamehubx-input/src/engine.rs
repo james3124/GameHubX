@@ -22,6 +22,8 @@ struct Active {
     binding: Option<String>,
     axes: Vec<(String, f32)>,
     range_binding: Option<String>,
+    /// Last normalized trackpad position, for relative delta computation.
+    trackpad: Option<(f32, f32)>,
 }
 
 pub struct Engine {
@@ -67,6 +69,7 @@ impl Engine {
             binding: None,
             axes: Vec::new(),
             range_binding: None,
+            trackpad: None,
         };
 
         match element.kind {
@@ -108,6 +111,9 @@ impl Engine {
                     events.push(InputEvent::Axis(binding, value));
                 }
             }
+            ElementType::Trackpad => {
+                active.trackpad = Some((x, y));
+            }
         }
 
         self.active.insert(id, active);
@@ -125,6 +131,7 @@ impl Engine {
         let mut new_binding = None;
         let mut new_axes = Vec::new();
         let mut new_range = None;
+        let mut new_trackpad = None;
 
         match element.kind {
             ElementType::DPad => {
@@ -157,6 +164,16 @@ impl Engine {
                     new_range = Some(binding);
                 }
             }
+            ElementType::Trackpad => {
+                if let Some((px, py)) = active.trackpad {
+                    events.push(InputEvent::MouseMove {
+                        dx: x - px,
+                        dy: y - py,
+                        speed: self.profile.cursor_speed,
+                    });
+                }
+                new_trackpad = Some((x, y));
+            }
             ElementType::Button => {}
         }
 
@@ -169,6 +186,9 @@ impl Engine {
             }
             if new_range.is_some() {
                 active.range_binding = new_range;
+            }
+            if let Some(position) = new_trackpad {
+                active.trackpad = Some(position);
             }
         }
         events
@@ -204,6 +224,7 @@ fn hit(element: &Element, x: f32, y: f32) -> bool {
     let radius = match element.kind {
         ElementType::Button | ElementType::RangeButton => 0.075 * scale,
         ElementType::DPad | ElementType::Stick => 0.10 * scale,
+        ElementType::Trackpad => 0.16 * scale,
     };
     let dx = (x - element.x).abs();
     let dy = (y - element.y).abs();

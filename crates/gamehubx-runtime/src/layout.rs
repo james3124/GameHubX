@@ -44,6 +44,10 @@ impl RuntimeLayout {
         self.root.join("dxvk")
     }
 
+    pub fn vkd3d(&self) -> PathBuf {
+        self.root.join("vkd3d")
+    }
+
     pub fn xserver(&self) -> PathBuf {
         self.root.join("xserver")
     }

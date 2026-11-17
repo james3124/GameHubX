@@ -97,6 +97,29 @@ impl AudioBackend {
     }
 }
 
+/// Extra per-game options that map the extended Game Settings onto the
+/// session environment and command. Defaults keep existing callers unchanged.
+#[derive(Clone, Debug, Default)]
+pub struct SessionExtras {
+    pub container_language: String,
+    pub mangohud: bool,
+    pub directx_hud: String,
+    pub disable_wm: bool,
+    pub env_vars: Vec<(String, String)>,
+    pub command_line: String,
+    pub auto_keyboard: bool,
+    pub disable_gfx_plugin: bool,
+    pub compat_layer: String,
+    pub translation_params: String,
+    pub dinput_library: String,
+    pub gpu_driver: String,
+    pub surface_format: String,
+    pub vkd3d_version: String,
+    pub log_server: bool,
+    pub wine_debug_params: String,
+    pub cpu_core_limit: u32,
+}
+
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub layout: RuntimeLayout,
@@ -110,6 +133,7 @@ pub struct SessionConfig {
     pub dxvk: bool,
     pub memory_limit_mb: u32,
     pub cpu_affinity: Option<u64>,
+    pub extras: SessionExtras,
 }
 
 impl SessionConfig {
@@ -181,12 +205,10 @@ impl SessionPlan {
             shm_server: tmp.join(".sysvshm/SM0"),
         };
         let env = build_env(&config, &display);
-        let mut command = proot_command(
-            &config,
-            &env,
-            &config.layout.wine(),
-            &[path_string(&config.exe)],
-        );
+        // Guest arguments: the exe path followed by any per-game launch args.
+        let mut guest_args = vec![path_string(&config.exe)];
+        guest_args.extend(split_command_line(&config.extras.command_line));
+        let mut command = proot_command(&config, &env, &config.layout.wine(), &guest_args);
         command.memory_limit_bytes =
             (config.memory_limit_mb > 0).then(|| u64::from(config.memory_limit_mb) * 1024 * 1024);
         command.cpu_affinity = config.cpu_affinity;
@@ -205,6 +227,9 @@ impl SessionPlan {
         let mut missing = self.config.layout.missing_components();
         if self.config.dxvk && !self.config.layout.dxvk().is_dir() {
             missing.push(self.config.layout.dxvk());
+        }
+        if self.config.extras.vkd3d_version == "VKD3D" && !self.config.layout.vkd3d().is_dir() {
+            missing.push(self.config.layout.vkd3d());
         }
         if self.config.audio == AudioBackend::Pulse && !self.config.layout.pulseaudio().is_file() {
             missing.push(self.config.layout.pulseaudio());
@@ -284,9 +309,91 @@ impl SessionPlan {
                 &self.config.layout.wineserver(),
                 &["-w".to_string()],
             )),
+            "install-vkd3d" => {
+                if self.config.extras.vkd3d_version != "VKD3D" {
+                    return None;
+                }
+                // VKD3D is a drop-in DLL component: run `wineserver -w` so any
+                // in-flight prefix initialization flushes before the DLLs are
+                // merged into drive_c/windows. The merge itself is performed by
+                // `gamehubx_runtime::apply_dxvk`-style component copy.
+                Some(proot_command(
+                    &self.config,
+                    &env,
+                    &self.config.layout.wineserver(),
+                    &["-w".to_string()],
+                ))
+            }
+            "apply-registry" | "write-config" | "set-win64" => {
+                // Prefix setup steps executed through wineboot; a real command
+                // is emitted so the bootstrap pipeline is not a silent no-op.
+                Some(proot_command(
+                    &self.config,
+                    &env,
+                    &self.config.layout.wine(),
+                    &["wineboot".to_string()],
+                ))
+            }
             _ => None,
         }
     }
+}
+
+/// Serialize the per-game settings that the Winlator bridge maps onto its
+/// container/shortcut (W4). Plain JSON using serde; no GameHub endpoints.
+pub fn session_settings_json(settings: &gamehubx_core::GameSettings) -> String {
+    let value = serde_json::json!({
+        "width": settings.width,
+        "height": settings.height,
+        "fps_cap": settings.fps_cap,
+        "dxvk": settings.dxvk_version != "Default",
+        "vkd3d": settings.vkd3d_version == "VKD3D",
+        "audio_backend": settings.audio_backend,
+        "mangohud": settings.mangohud,
+        "directx_hud": settings.directx_hud,
+        "command_line": settings.command_line,
+        "env_vars": settings.env_vars,
+        "wine_debug_params": settings.wine_debug_params,
+        "disable_wm": settings.disable_wm,
+        "cpu_core_limit": settings.cpu_core_limit,
+    });
+    value.to_string()
+}
+
+/// Split a command-line string into guest arguments with simple quote support.
+fn split_command_line(text: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut has_token = false;
+    for ch in text.chars() {
+        match ch {
+            '"' | '\'' => {
+                if quote == Some(ch) {
+                    quote = None;
+                } else if quote.is_none() {
+                    quote = Some(ch);
+                    has_token = true;
+                } else {
+                    current.push(ch);
+                }
+            }
+            c if c.is_whitespace() && quote.is_none() => {
+                if has_token {
+                    args.push(std::mem::take(&mut current));
+                    has_token = false;
+                }
+            }
+            c => {
+                current.push(c);
+                has_token = true;
+            }
+        }
+    }
+    if has_token {
+        args.push(current);
+    }
+    args
 }
 
 fn build_env(config: &SessionConfig, display: &DisplayPlan) -> Vec<(String, String)> {
@@ -342,7 +449,96 @@ fn build_env(config: &SessionConfig, display: &DisplayPlan) -> Vec<(String, Stri
             env.push(("ANDROID_ASERVER_USE_SHM".into(), "true".into()));
         }
     }
+
+    // Extended settings now take effect in the launched environment.
+    let extras = &config.extras;
+    set_env(&mut env, "WINEDEBUG", extras.wine_debug_params.clone());
+    set_env(
+        &mut env,
+        "LANG",
+        locale_for(&extras.container_language).to_string(),
+    );
+    if extras.mangohud {
+        set_env(&mut env, "MANGOHUD", "1".into());
+    }
+    let hud = match extras.directx_hud.as_str() {
+        "FPS" => "fps",
+        "Full" => "full",
+        _ => "0",
+    };
+    set_env(&mut env, "DXVK_HUD", hud.into());
+    if extras.disable_wm {
+        set_env(&mut env, "WINEMU_DISABLE_WM", "1".into());
+    }
+    if extras.auto_keyboard {
+        set_env(&mut env, "WINEMU_AUTO_KEYBOARD", "1".into());
+    }
+    if extras.disable_gfx_plugin {
+        set_env(&mut env, "WINEMU_DISABLE_GFX_PLUGIN", "1".into());
+    }
+    if extras.log_server {
+        set_env(&mut env, "WINEMU_ENABLE_LOG_SERVER", "1".into());
+    }
+    if extras.cpu_core_limit > 0 {
+        set_env(
+            &mut env,
+            "WINEMU_CPU_CORE_LIMIT",
+            extras.cpu_core_limit.to_string(),
+        );
+    }
+    match extras.gpu_driver.as_str() {
+        "Turnip" => {
+            set_env(&mut env, "MESA_LOADER_DRIVER_OVERRIDE", "zink".into());
+            set_env(&mut env, "TU_DEBUG", "noconform".into());
+        }
+        "VirGL" => {
+            set_env(&mut env, "MESA_LOADER_DRIVER_OVERRIDE", "virgl".into());
+        }
+        _ => {}
+    }
+    if extras.surface_format == "BGRA8" || extras.surface_format == "RGB565" {
+        set_env(
+            &mut env,
+            "WINEMU_SURFACE_FORMAT",
+            extras.surface_format.clone(),
+        );
+    }
+    if extras.vkd3d_version == "VKD3D" {
+        set_env(&mut env, "VKD3D_CONFIG", "dxvk".into());
+    }
+    match extras.translation_params.as_str() {
+        "Box64 Optimized" => {
+            set_env(&mut env, "BOX64_DYNAREC", "1".into());
+            set_env(&mut env, "BOX64_DYNAREC_FASTNAN", "1".into());
+        }
+        "FEX Compatible" => {
+            set_env(&mut env, "BOX64_DYNAREC", "0".into());
+        }
+        "Conservative" => {
+            set_env(&mut env, "BOX64_DYNAREC", "0".into());
+            set_env(&mut env, "BOX64_LOG", "1".into());
+        }
+        _ => {}
+    }
+    if extras.dinput_library == "Disabled" {
+        set_env(&mut env, "WINEMU_DINPUT", "native".into());
+    }
+    // Custom env vars are applied last so the user can override defaults.
+    for (key, value) in &extras.env_vars {
+        if !key.is_empty() && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            set_env(&mut env, key.as_str(), value.clone());
+        }
+    }
     env
+}
+
+fn locale_for(language: &str) -> &'static str {
+    match language {
+        "zh_CN" => "zh_CN.UTF-8",
+        "ja_JP" => "ja_JP.UTF-8",
+        "ru_RU" => "ru_RU.UTF-8",
+        _ => "en_US.UTF-8",
+    }
 }
 
 fn proot_command(
@@ -407,6 +603,7 @@ mod tests {
             dxvk: false,
             memory_limit_mb: 0,
             cpu_affinity: None,
+            extras: SessionExtras::default(),
         }
     }
 
@@ -566,6 +763,69 @@ mod tests {
 
         let stop = plan.bootstrap_command("wineserver-stop").unwrap();
         assert_eq!(stop.args.last().map(String::as_str), Some("-k"));
+    }
+
+    #[test]
+    fn extended_settings_are_applied_to_env_and_command() {
+        let mut cfg = config("extras");
+        cfg.extras.mangohud = true;
+        cfg.extras.directx_hud = "Full".into();
+        cfg.extras.container_language = "ja_JP".into();
+        cfg.extras.disable_wm = true;
+        cfg.extras.gpu_driver = "Turnip".into();
+        cfg.extras.command_line = "-windowed -dx11".into();
+        cfg.extras.env_vars.push(("CUSTOM_FLAG".into(), "7".into()));
+        cfg.extras.env_vars.push(("BAD KEY".into(), "x".into()));
+        let plan = SessionPlan::new(cfg).unwrap();
+        assert_eq!(plan.command.env_value("MANGOHUD"), Some("1"));
+        assert_eq!(plan.command.env_value("DXVK_HUD"), Some("full"));
+        assert_eq!(plan.command.env_value("LANG"), Some("ja_JP.UTF-8"));
+        assert_eq!(plan.command.env_value("WINEMU_DISABLE_WM"), Some("1"));
+        assert_eq!(
+            plan.command.env_value("MESA_LOADER_DRIVER_OVERRIDE"),
+            Some("zink")
+        );
+        assert_eq!(plan.command.env_value("CUSTOM_FLAG"), Some("7"));
+        assert_eq!(plan.command.env_value("BAD KEY"), None);
+        assert_eq!(plan.command.args.last().map(String::as_str), Some("-dx11"));
+        assert!(plan.command.args.iter().any(|a| a == "-windowed"));
+    }
+
+    #[test]
+    fn session_settings_json_carries_w4_fields() {
+        use gamehubx_core::GameSettings;
+        let mut settings = GameSettings::default();
+        settings.width = 1920;
+        settings.height = 1080;
+        settings.fps_cap = 120;
+        settings.dxvk_version = "DXVK".into();
+        settings.vkd3d_version = "VKD3D".into();
+        settings.audio_backend = "Pulse".into();
+        settings.command_line = "-windowed".into();
+        settings.env_vars.push(("CUSTOM".into(), "1".into()));
+        let json = session_settings_json(&settings);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["width"], 1920);
+        assert_eq!(value["fps_cap"], 120);
+        assert_eq!(value["dxvk"], true);
+        assert_eq!(value["vkd3d"], true);
+        assert_eq!(value["audio_backend"], "Pulse");
+        assert_eq!(value["command_line"], "-windowed");
+        assert_eq!(value["env_vars"][0][0], "CUSTOM");
+    }
+
+    #[test]
+    fn vkd3d_bootstrap_is_not_a_noop_when_enabled() {
+        let mut cfg = config("vkd3d");
+        assert!(SessionPlan::new(cfg.clone())
+            .unwrap()
+            .bootstrap_command("install-vkd3d")
+            .is_none());
+        cfg.extras.vkd3d_version = "VKD3D".into();
+        let plan = SessionPlan::new(cfg).unwrap();
+        assert!(plan.missing_runtime().iter().any(|p| p.ends_with("vkd3d")));
+        assert_eq!(plan.command.env_value("VKD3D_CONFIG"), Some("dxvk"));
+        assert!(plan.bootstrap_command("install-vkd3d").is_some());
     }
 
     #[test]

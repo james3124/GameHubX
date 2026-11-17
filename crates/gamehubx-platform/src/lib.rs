@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+pub mod storage_categories;
+pub use storage_categories::{scan_storage_categories, StorageCategories};
+
 static ANDROID_FILES_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn set_android_files_dir(path: impl Into<PathBuf>) {
@@ -310,17 +313,24 @@ pub fn poll_gamepad_action() -> i32 {
     }
 }
 
-pub fn launch_winlator_game(exe: &str, name: &str) -> Result<(), String> {
+pub fn launch_winlator_game(exe: &str, name: &str, settings_json: &str) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
         let outcome = with_activity(|env, activity| -> jni::errors::Result<Option<String>> {
             let exe = env.new_string(exe)?;
             let name = env.new_string(name)?;
+            let settings = env.new_string(settings_json)?;
             let value = env.call_method(
                 &activity,
                 jni::jni_str!("launchWinlator"),
-                jni::jni_sig!("(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"),
-                &[jni::JValue::Object(&*exe), jni::JValue::Object(&*name)],
+                jni::jni_sig!(
+                    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+                ),
+                &[
+                    jni::JValue::Object(&*exe),
+                    jni::JValue::Object(&*name),
+                    jni::JValue::Object(&*settings),
+                ],
             )?;
             if value.is_null() {
                 return Ok(None);
@@ -337,8 +347,60 @@ pub fn launch_winlator_game(exe: &str, name: &str) -> Result<(), String> {
     }
     #[cfg(not(target_os = "android"))]
     {
-        let _ = (exe, name);
+        let _ = (exe, name, settings_json);
         Err("Winlator session is Android-only".to_string())
+    }
+}
+
+/// Consume a pending shortcut launch path set by a pinned home-screen icon.
+pub fn consume_shortcut_exe() -> Option<String> {
+    #[cfg(target_os = "android")]
+    {
+        with_activity(|env, activity| -> jni::errors::Result<Option<String>> {
+            let value = env.call_method(
+                &activity,
+                jni::jni_str!("consumeShortcutExe"),
+                jni::jni_sig!("()Ljava/lang/String;"),
+                &[],
+            )?;
+            if value.is_null() {
+                return Ok(None);
+            }
+            let object = value.l()?;
+            let text = env.cast_local::<jni::objects::JString>(object)?;
+            Ok(Some(text.to_string()))
+        })
+        .flatten()
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        None
+    }
+}
+
+/// Pin a game to the Android home screen through the activity's
+/// `addHomeShortcut(String,String)` method. Returns false on desktop or on any
+/// JNI failure (the launcher must never crash over a shortcut).
+pub fn add_home_shortcut(exe: &str, name: &str) -> bool {
+    #[cfg(target_os = "android")]
+    {
+        with_activity(|env, activity| -> jni::errors::Result<bool> {
+            let exe = env.new_string(exe)?;
+            let name = env.new_string(name)?;
+            let value = env.call_method(
+                &activity,
+                jni::jni_str!("addHomeShortcut"),
+                jni::jni_sig!("(Ljava/lang/String;Ljava/lang/String;)Z"),
+                &[jni::JValue::Object(&*exe), jni::JValue::Object(&*name)],
+            )?;
+            Ok(matches!(value, jni::JValueOwned::Bool(true)))
+        })
+        .unwrap_or(false)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (exe, name);
+        false
     }
 }
 

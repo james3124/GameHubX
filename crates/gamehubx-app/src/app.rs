@@ -15,7 +15,7 @@ use gamehubx_platform::{
 };
 use gamehubx_runtime::{
     apply_dxvk, install_component, AudioBackend, ContainerManager, ContainerMetadata, LocalSource,
-    RuntimeLayout, RuntimeManifest, SessionConfig, SessionPlan,
+    RuntimeLayout, RuntimeManifest, SessionConfig, SessionExtras, SessionPlan,
 };
 use gamehubx_storage::LibraryStore;
 use gamehubx_supervisor::{PssSample, RunningSession, Supervisor};
@@ -63,13 +63,54 @@ pub(crate) type Ent = (String, bool, usize);
 
 pub(crate) struct Tile;
 
+/// Selector for an extended string setting cycled from the Game Settings UI.
+#[derive(Clone, Copy)]
+pub(crate) enum ExtendedField {
+    ContainerLanguage,
+    DirectxHud,
+    CompatLayer,
+    TranslationParams,
+    DinputLibrary,
+    GpuDriver,
+    SurfaceFormat,
+    Vkd3d,
+    ConfigPreset,
+}
+
+/// Selector for an extended boolean setting toggled from the Game Settings UI.
+#[derive(Clone, Copy)]
+pub(crate) enum BoolField {
+    Mangohud,
+    DisableWm,
+    AutoKeyboard,
+    DisableGfxPlugin,
+    LogServer,
+    RtsGestures,
+}
+
+/// Which free-text setting the editor modal is editing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TextEditorKind {
+    CommandLine,
+    WineDebug,
+    EnvVars,
+}
+
+/// Why the file browser was opened.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FilePurpose {
+    Import,
+    StartupExe,
+    BackupArchive,
+    CoverImage,
+}
+
 pub struct App {
     pub(crate) s: S,
     pub(crate) stack: Vec<S>,
     pub(crate) drawer: bool,
     pub(crate) modal: bool,
     pub(crate) popup: bool,
-    pub(crate) imp: bool,
     pub(crate) path: PathBuf,
     pub(crate) ents: Vec<Ent>,
     pub(crate) pend: PathBuf,
@@ -117,7 +158,13 @@ pub struct App {
     pub(crate) cur: usize,
     pub(crate) sel: usize,
     pub(crate) pane: usize,
-    pub(crate) tg: [bool; 4],
+    /// Active free-text settings editor (command line / debug params / env).
+    pub(crate) text_editor: Option<TextEditorKind>,
+    pub(crate) text_buffer: String,
+    /// Cached cover textures keyed by game local id.
+    pub(crate) cover_textures: HashMap<String, TextureHandle>,
+    /// Purpose of the current file-browser visit.
+    pub(crate) file_purpose: FilePurpose,
 }
 
 pub(crate) fn list(p: &Path) -> Vec<Ent> {
@@ -297,7 +344,6 @@ impl App {
             drawer: false,
             modal: false,
             popup: false,
-            imp: true,
             path,
             ents,
             pend: PathBuf::new(),
@@ -347,9 +393,25 @@ impl App {
             cur: 0,
             sel: 0,
             pane: 0,
-            tg: [false, false, true, false],
+            text_editor: None,
+            text_buffer: String::new(),
+            cover_textures: HashMap::new(),
+            file_purpose: FilePurpose::Import,
         };
         app.rebuild_tiles();
+        // A pinned home-screen shortcut carries the exe path; open that game.
+        if let Some(shortcut_exe) = gamehubx_platform::consume_shortcut_exe() {
+            if let Some(position) = app.games.iter().position(|game| {
+                game.exe
+                    .as_ref()
+                    .map(|p| p == &std::path::PathBuf::from(&shortcut_exe))
+                    .unwrap_or(false)
+            }) {
+                app.cur = position;
+                app.sel = position + 2;
+                app.launch_game();
+            }
+        }
         app
     }
 
@@ -533,6 +595,382 @@ impl App {
         self.save_game_settings();
     }
 
+    /// Cycle one of the extended string settings backed by a core option list.
+    pub(crate) fn cycle_extended(&mut self, options: &[&str], field: ExtendedField) {
+        use gamehubx_core::cycle_option;
+        let current = match field {
+            ExtendedField::ContainerLanguage => &self.game_settings.container_language,
+            ExtendedField::DirectxHud => &self.game_settings.directx_hud,
+            ExtendedField::CompatLayer => &self.game_settings.compat_layer,
+            ExtendedField::TranslationParams => &self.game_settings.translation_params,
+            ExtendedField::DinputLibrary => &self.game_settings.dinput_library,
+            ExtendedField::GpuDriver => &self.game_settings.gpu_driver,
+            ExtendedField::SurfaceFormat => &self.game_settings.surface_format,
+            ExtendedField::Vkd3d => &self.game_settings.vkd3d_version,
+            ExtendedField::ConfigPreset => &self.game_settings.config_preset,
+        }
+        .clone();
+        let next = cycle_option(options, &current);
+        match field {
+            ExtendedField::ContainerLanguage => self.game_settings.container_language = next,
+            ExtendedField::DirectxHud => self.game_settings.directx_hud = next,
+            ExtendedField::CompatLayer => self.game_settings.compat_layer = next,
+            ExtendedField::TranslationParams => self.game_settings.translation_params = next,
+            ExtendedField::DinputLibrary => self.game_settings.dinput_library = next,
+            ExtendedField::GpuDriver => self.game_settings.gpu_driver = next,
+            ExtendedField::SurfaceFormat => self.game_settings.surface_format = next,
+            ExtendedField::Vkd3d => self.game_settings.vkd3d_version = next,
+            ExtendedField::ConfigPreset => {
+                self.game_settings.config_preset = next.clone();
+                self.game_settings.apply_preset(&next);
+            }
+        }
+        self.save_game_settings();
+    }
+
+    /// Toggle one of the extended boolean settings and persist it.
+    pub(crate) fn toggle_extended(&mut self, field: BoolField) {
+        match field {
+            BoolField::Mangohud => self.game_settings.mangohud = !self.game_settings.mangohud,
+            BoolField::DisableWm => self.game_settings.disable_wm = !self.game_settings.disable_wm,
+            BoolField::AutoKeyboard => {
+                self.game_settings.auto_keyboard = !self.game_settings.auto_keyboard
+            }
+            BoolField::DisableGfxPlugin => {
+                self.game_settings.disable_gfx_plugin = !self.game_settings.disable_gfx_plugin
+            }
+            BoolField::LogServer => self.game_settings.log_server = !self.game_settings.log_server,
+            BoolField::RtsGestures => {
+                self.game_settings.rts_gestures = !self.game_settings.rts_gestures
+            }
+        }
+        self.save_game_settings();
+    }
+
+    pub(crate) fn cycle_cpu_core_limit(&mut self) {
+        const OPTIONS: [u32; 5] = [0, 2, 4, 6, 8];
+        let position = OPTIONS
+            .iter()
+            .position(|value| *value == self.game_settings.cpu_core_limit)
+            .unwrap_or(0);
+        self.game_settings.cpu_core_limit = OPTIONS[(position + 1) % OPTIONS.len()];
+        self.save_game_settings();
+    }
+
+    /// Back up the current game's container into the app data dir.
+    pub(crate) fn backup_current_container(&mut self) {
+        use gamehubx_runtime::backup_container;
+        let Some(id) = self.current_id() else {
+            self.settings_notice = Some("No game selected".into());
+            return;
+        };
+        let container = data_dir().join("containers").join(format!("{:016x}", id.0));
+        let backups = data_dir().join("backups");
+        let label = self
+            .games
+            .get(self.cur)
+            .map(|game| game.label.clone())
+            .unwrap_or_else(|| id.0.to_string());
+        let safe: String = label
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let archive = backups.join(format!("{safe}-{:016x}.tar.gz", id.0));
+        match backup_container(&container, &archive) {
+            Ok(bytes) => {
+                self.settings_notice = Some(format!(
+                    "Backed up container ({} bytes) to {}",
+                    bytes,
+                    archive.display()
+                ));
+            }
+            Err(error) => {
+                self.settings_notice = Some(format!("Backup failed: {error}"));
+            }
+        }
+    }
+
+    /// Restore the current game's container from a chosen archive path stored
+    /// in `pend`. The path is validated to be an existing file.
+    pub(crate) fn restore_current_container(&mut self) {
+        use gamehubx_runtime::restore_container;
+        let Some(id) = self.current_id() else {
+            self.settings_notice = Some("No game selected".into());
+            return;
+        };
+        if self.pend.as_os_str().is_empty() || !self.pend.is_file() {
+            self.settings_notice = Some("Choose a backup archive first (Files → .tar.gz)".into());
+            return;
+        }
+        let container = data_dir().join("containers").join(format!("{:016x}", id.0));
+        match restore_container(&self.pend, &container) {
+            Ok(count) => {
+                self.settings_notice = Some(format!("Restored {count} file(s) into container"));
+                self.pend = PathBuf::new();
+            }
+            Err(error) => {
+                self.settings_notice = Some(format!("Restore failed: {error}"));
+            }
+        }
+    }
+
+    /// Reset the current game's container data by deleting and recreating it.
+    pub(crate) fn reset_current_container(&mut self) {
+        use gamehubx_runtime::{ContainerManager, ContainerMetadata};
+        let Some(id) = self.current_id() else {
+            self.settings_notice = Some("No game selected".into());
+            return;
+        };
+        let manager = match ContainerManager::new(data_dir().join("containers")) {
+            Ok(manager) => manager,
+            Err(error) => {
+                self.settings_notice = Some(format!("Container reset failed: {error}"));
+                return;
+            }
+        };
+        let label = self
+            .games
+            .get(self.cur)
+            .map(|game| game.label.clone())
+            .unwrap_or_else(|| "Game".into());
+        let metadata = ContainerMetadata::new(label, "/runtime/wine/bin/wine64", "open");
+        let result = manager
+            .delete(id)
+            .ok()
+            .and_then(|_| manager.create(id, metadata).ok());
+        self.settings_notice = Some(if result.is_some() {
+            "Container data reset".into()
+        } else {
+            "Container reset failed".into()
+        });
+    }
+
+    /// Load (and cache) a game's cover texture. Prefers an explicit cover file;
+    /// otherwise extracts the embedded icon from the game's .exe, mirroring the
+    /// reference launcher's automatic cover handling.
+    pub(crate) fn cover_texture(&mut self, ctx: &Context, game: &Game) -> Option<TextureHandle> {
+        let key = game.local_id();
+        if let Some(texture) = self.cover_textures.get(&key) {
+            return Some(texture.clone());
+        }
+        let image = game
+            .cover
+            .as_ref()
+            .and_then(|path| fs::read(path).ok())
+            .and_then(|bytes| image::load_from_memory(&bytes).ok())
+            .map(|dynamic| dynamic.to_rgba8())
+            .and_then(|rgba| {
+                let (w, h) = rgba.dimensions();
+                if w == 0 || h == 0 {
+                    None
+                } else {
+                    Some(ColorImage::from_rgba_unmultiplied(
+                        [w as usize, h as usize],
+                        rgba.as_raw(),
+                    ))
+                }
+            })
+            .or_else(|| {
+                let exe = game.exe.as_ref()?;
+                let bytes = fs::read(exe).ok()?;
+                let icon = crate::pe_icon::extract_first_icon(&bytes)?;
+                Some(ColorImage::from_rgba_unmultiplied(
+                    [icon.width as usize, icon.height as usize],
+                    &icon.rgba,
+                ))
+            })?;
+        let texture = ctx.load_texture(format!("cover-{key}"), image, TextureOptions::LINEAR);
+        self.cover_textures.insert(key, texture.clone());
+        Some(texture)
+    }
+
+    pub(crate) fn open_text_editor(&mut self, kind: TextEditorKind) {
+        self.load_current_settings();
+        self.text_buffer = match kind {
+            TextEditorKind::CommandLine => self.game_settings.command_line.clone(),
+            TextEditorKind::WineDebug => self.game_settings.wine_debug_params.clone(),
+            TextEditorKind::EnvVars => String::new(),
+        };
+        self.text_editor = Some(kind);
+    }
+
+    pub(crate) fn open_env_editor(&mut self) {
+        self.load_current_settings();
+        // One "KEY=VALUE" per line.
+        self.text_buffer = self
+            .game_settings
+            .env_vars
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        self.text_editor = Some(TextEditorKind::EnvVars);
+    }
+
+    /// Commit the active text editor buffer into GameSettings and persist.
+    pub(crate) fn commit_text_editor(&mut self) {
+        let Some(kind) = self.text_editor else {
+            return;
+        };
+        match kind {
+            TextEditorKind::CommandLine => {
+                self.game_settings.command_line = self.text_buffer.trim().to_string();
+            }
+            TextEditorKind::WineDebug => {
+                let value = self.text_buffer.trim();
+                self.game_settings.wine_debug_params = if value.is_empty() {
+                    "-all".to_string()
+                } else {
+                    value.to_string()
+                };
+            }
+            TextEditorKind::EnvVars => {
+                let mut vars = Vec::new();
+                for line in self.text_buffer.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+                    if let Some((key, value)) = line.split_once('=') {
+                        let key = key.trim();
+                        if !key.is_empty()
+                            && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                        {
+                            vars.push((key.to_string(), value.trim().to_string()));
+                        }
+                    }
+                }
+                self.game_settings.env_vars = vars;
+            }
+        }
+        self.save_game_settings();
+        self.text_editor = None;
+        self.text_buffer.clear();
+    }
+
+    /// Names of runtime components that have a verified install marker.
+    pub(crate) fn runtime_component_names(&self) -> Vec<String> {
+        let root = self.runtime_root();
+        let names = [
+            "proot",
+            "wine",
+            "rootfs",
+            "xserver",
+            "box64",
+            "dxvk",
+            "vkd3d",
+            "pulseaudio",
+        ];
+        names
+            .iter()
+            .filter(|name| {
+                let dir = root.join(name);
+                let marker = root.join(format!(".{name}.installed"));
+                dir.exists() || marker.exists()
+            })
+            .map(|name| name.to_string())
+            .collect()
+    }
+
+    /// Launch a Wine container desktop (explorer.exe) through the Rust session
+    /// path. On Android the Winlator session handles game launches instead.
+    pub(crate) fn launch_container_desktop(&mut self) {
+        #[cfg(target_os = "android")]
+        {
+            self.settings_notice = Some("Use the Winlator Session desktop from Settings".into());
+            return;
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            let missing = RuntimeLayout::new(self.runtime_root()).missing_components();
+            self.settings_notice = Some(if missing.is_empty() {
+                "Container desktop requires an interactive session host with explorer.exe".into()
+            } else {
+                format!(
+                    "Runtime pack incomplete ({} component(s) missing); install it before opening a desktop",
+                    missing.len()
+                )
+            });
+        }
+    }
+
+    /// Pin the current game to the Android home screen (no-op on desktop).
+    pub(crate) fn pin_current_game(&mut self) {
+        #[cfg(target_os = "android")]
+        {
+            let exe = self.current_exe();
+            let label = self
+                .games
+                .get(self.cur)
+                .map(|game| game.label.clone())
+                .unwrap_or_default();
+            let ok = gamehubx_platform::add_home_shortcut(&exe, &label);
+            self.settings_notice = Some(if ok {
+                "Shortcut pinned to Home".into()
+            } else {
+                "Shortcut pinning is unavailable or was cancelled".into()
+            });
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            self.settings_notice = Some("Home-screen shortcuts are available on Android".into());
+        }
+    }
+
+    /// Import the pending .exe, extracting its embedded PE icon as a PNG cover
+    /// (mirroring the reference launcher's automatic cover behaviour).
+    pub(crate) fn import_pending_with_cover(&mut self, label: String, intro: String) {
+        let cover_path = self
+            .pend
+            .file_stem()
+            .and_then(|stem| {
+                std::fs::read(&self.pend)
+                    .ok()
+                    .and_then(|bytes| crate::pe_icon::extract_first_icon(&bytes))
+                    .map(|icon| (stem.to_string_lossy().to_string(), icon))
+            })
+            .and_then(|(stem, icon)| {
+                let dir = data_dir().join("covers");
+                if std::fs::create_dir_all(&dir).is_err() {
+                    return None;
+                }
+                let path = dir.join(format!("{stem}.png"));
+                let buffer = image::RgbaImage::from_raw(icon.width, icon.height, icon.rgba)?;
+                buffer.save(&path).ok()?;
+                Some(path)
+            });
+
+        let mut game = Game::new_pc_exe(label, intro, self.pend.clone());
+        game.cover = cover_path;
+        self.add_game(game);
+        self.reset_import();
+        self.modal = false;
+    }
+
+    /// Set the cover image path from the pending file selection.
+    pub(crate) fn set_pending_cover(&mut self) {
+        if self.pend.as_os_str().is_empty() {
+            return;
+        }
+        let path = self.pend.clone();
+        if let Some(id) = self.current_id() {
+            if let Some(game) = self.games.iter_mut().find(|game| game.id == id) {
+                game.cover = Some(path.clone());
+            }
+            if let Some(store) = &self.store {
+                let _ = store.set_cover(id, Some(&path));
+            }
+            self.settings_notice = Some(format!("Cover set to {}", path.display()));
+        }
+        self.pend = PathBuf::new();
+    }
+
     pub(crate) fn open_touch_editor(&mut self) {
         self.load_current_settings();
         let selected = self
@@ -658,7 +1096,9 @@ impl App {
         #[cfg(target_os = "android")]
         {
             let exe_text = exe.to_string_lossy();
-            match gamehubx_platform::launch_winlator_game(exe_text.as_ref(), &label) {
+            let settings_json = gamehubx_runtime::session_settings_json(&settings);
+            match gamehubx_platform::launch_winlator_game(exe_text.as_ref(), &label, &settings_json)
+            {
                 Ok(()) => {
                     self.session_status = "Launching in Winlator".into();
                     return;
@@ -692,6 +1132,25 @@ impl App {
         } else {
             None
         };
+        let extras = SessionExtras {
+            container_language: settings.container_language.clone(),
+            mangohud: settings.mangohud,
+            directx_hud: settings.directx_hud.clone(),
+            disable_wm: settings.disable_wm,
+            env_vars: settings.env_vars.clone(),
+            command_line: settings.command_line.clone(),
+            auto_keyboard: settings.auto_keyboard,
+            disable_gfx_plugin: settings.disable_gfx_plugin,
+            compat_layer: settings.compat_layer.clone(),
+            translation_params: settings.translation_params.clone(),
+            dinput_library: settings.dinput_library.clone(),
+            gpu_driver: settings.gpu_driver.clone(),
+            surface_format: settings.surface_format.clone(),
+            vkd3d_version: settings.vkd3d_version.clone(),
+            log_server: settings.log_server,
+            wine_debug_params: settings.wine_debug_params.clone(),
+            cpu_core_limit: settings.cpu_core_limit,
+        };
         let config = SessionConfig {
             layout: RuntimeLayout::new(data.join("runtime")),
             container: data.join("containers").join(format!("{:016x}", id.0)),
@@ -704,6 +1163,7 @@ impl App {
             dxvk: settings.dxvk_version != "Default",
             memory_limit_mb: settings.memory_limit_mb,
             cpu_affinity,
+            extras,
         };
         let plan = match SessionPlan::new(config) {
             Ok(plan) => plan,
@@ -737,6 +1197,13 @@ impl App {
             self.session_error = Some(format!("DXVK apply failed: {error:?}"));
             self.go(S::Session);
             return;
+        }
+        if plan.config().extras.vkd3d_version == "VKD3D" {
+            if let Err(error) = apply_dxvk(&layout, &container, true) {
+                self.session_error = Some(format!("VKD3D apply failed: {error:?}"));
+                self.go(S::Session);
+                return;
+            }
         }
         if let Err(error) = plan.prepare_audio() {
             self.session_error = Some(format!("Audio setup failed: {error:?}"));
@@ -1164,7 +1631,51 @@ impl App {
     }
 
     pub(crate) fn open_files(&mut self, imp: bool) {
-        self.imp = imp;
+        self.file_purpose = if imp {
+            FilePurpose::Import
+        } else {
+            FilePurpose::StartupExe
+        };
+        self.refresh_files_access();
+        self.nav(files_root());
+        self.go(S::Files);
+    }
+
+    /// Clear transient cache files (download .part files and stale bridge
+    /// shortcuts) without touching the library or installed runtime.
+    pub(crate) fn clear_cache(&mut self) {
+        use gamehubx_download::part_path;
+        let mut removed = 0usize;
+        if let Some(store) = &self.store {
+            if let Ok(tasks) = store.downloads() {
+                for task in tasks {
+                    let part = part_path(&task.dest);
+                    if part.is_file() && fs::remove_file(&part).is_ok() {
+                        removed += 1;
+                    }
+                }
+            }
+        }
+        let cache = data_dir().join("cache");
+        if cache.is_dir() {
+            for entry in fs::read_dir(&cache).into_iter().flatten().flatten() {
+                if entry.path().is_file() && fs::remove_file(entry.path()).is_ok() {
+                    removed += 1;
+                }
+            }
+        }
+        self.settings_notice = Some(format!("Cleared {removed} cached file(s)"));
+    }
+
+    pub(crate) fn open_cover_picker(&mut self) {
+        self.file_purpose = FilePurpose::CoverImage;
+        self.refresh_files_access();
+        self.nav(files_root());
+        self.go(S::Files);
+    }
+
+    pub(crate) fn open_backup_picker(&mut self) {
+        self.file_purpose = FilePurpose::BackupArchive;
         self.refresh_files_access();
         self.nav(files_root());
         self.go(S::Files);

@@ -25,7 +25,11 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             if btn(ui, "Advanced", vec2(440.0, 88.0), CARD, W, 26.0).clicked() {
                 app.go(S::Diag);
             }
-            btn(ui, "About", vec2(440.0, 88.0), CLEAR, DIM, 26.0);
+            if btn(ui, "About", vec2(440.0, 88.0), CLEAR, W, 26.0).clicked() {
+                app.settings_notice = Some(
+                    "GameHubX 0.1.0 · GPL-3.0 · Open Wine/Winlator runtime · local library".into(),
+                );
+            }
         });
         ui.vertical(|ui| {
             let language = app.language_value();
@@ -63,7 +67,16 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             {
                 app.open_winlator();
             }
-            row(ui, "Clear Cache", "", "");
+            if row(
+                ui,
+                "Clear Cache",
+                "Remove download parts and temporary files",
+                "›",
+            )
+            .clicked()
+            {
+                app.clear_cache();
+            }
             if let Some(notice) = &app.settings_notice {
                 ui.label(RichText::new(notice).size(18.0).color(ACC));
             }

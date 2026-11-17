@@ -5,6 +5,7 @@ mod download_queue;
 mod focus;
 mod i18n;
 mod overlays;
+mod pe_icon;
 mod screens;
 mod theme;
 mod widgets;

@@ -1,5 +1,4 @@
 use eframe::egui::*;
-use gamehubx_core::Game;
 
 use crate::app::{App, S};
 use crate::theme::*;
@@ -158,10 +157,8 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
                             } else {
                                 app.name.trim().to_string()
                             };
-                            let game = Game::new_pc_exe(label, app.intro.trim(), app.pend.clone());
-                            app.add_game(game);
-                            app.reset_import();
-                            app.modal = false;
+                            let intro = app.intro.trim().to_string();
+                            app.import_pending_with_cover(label, intro);
                         }
                     });
                 });
@@ -178,16 +175,12 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
                     app.popup = false;
                     app.go(S::Set);
                 }
-                if btn(
-                    ui,
-                    "Add to Home screen",
-                    vec2(340.0, 70.0),
-                    CLEAR,
-                    DIM,
-                    26.0,
-                )
-                .clicked()
-                {
+                if btn(ui, "Add to Home screen", vec2(340.0, 70.0), CLEAR, W, 26.0).clicked() {
+                    app.pin_current_game();
+                    app.popup = false;
+                }
+                if btn(ui, "Set cover image", vec2(340.0, 70.0), CLEAR, W, 26.0).clicked() {
+                    app.open_cover_picker();
                     app.popup = false;
                 }
                 if btn(ui, "Uninstall game", vec2(340.0, 70.0), CLEAR, DIM, 26.0).clicked() {
@@ -197,6 +190,48 @@ pub(crate) fn layers(app: &mut App, ctx: &Context) {
                     app.popup = false;
                     app.sel = 0;
                 }
+            });
+    }
+
+    if let Some(kind) = app.text_editor {
+        let title = match kind {
+            crate::app::TextEditorKind::CommandLine => "Launch parameters",
+            crate::app::TextEditorKind::WineDebug => "Wine debug params (WINEDEBUG)",
+            crate::app::TextEditorKind::EnvVars => "Environment variables (KEY=VALUE per line)",
+        };
+        let multiline = kind == crate::app::TextEditorKind::EnvVars;
+        Window::new("text_editor")
+            .title_bar(false)
+            .frame(frame())
+            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+            .fixed_size([760.0, 480.0])
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(16.0);
+                    ui.label(RichText::new(title).size(28.0).strong());
+                    ui.add_space(16.0);
+                    let editor = if multiline {
+                        TextEdit::multiline(&mut app.text_buffer)
+                            .desired_width(700.0)
+                            .desired_rows(12)
+                            .font(FontId::proportional(18.0))
+                    } else {
+                        TextEdit::singleline(&mut app.text_buffer)
+                            .desired_width(700.0)
+                            .font(FontId::proportional(22.0))
+                    };
+                    ui.add(editor);
+                    ui.add_space(16.0);
+                    ui.horizontal(|ui| {
+                        if btn(ui, "Cancel", vec2(320.0, 72.0), CARD, W, 24.0).clicked() {
+                            app.text_editor = None;
+                            app.text_buffer.clear();
+                        }
+                        if btn(ui, "Save", vec2(320.0, 72.0), W, Color32::BLACK, 24.0).clicked() {
+                            app.commit_text_editor();
+                        }
+                    });
+                });
             });
     }
 }

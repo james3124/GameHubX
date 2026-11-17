@@ -10,3 +10,4 @@ publish.workspace = true
 gamehubx-core = { path = "../gamehubx-core" }
 gamehubx-download = { path = "../gamehubx-download" }
 rusqlite = { version = "0.32", features = ["bundled"] }
+serde_json.workspace = true

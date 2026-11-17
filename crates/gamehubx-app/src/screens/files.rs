@@ -93,21 +93,51 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
         let path = app.path.join(&name);
         if is_dir {
             app.nav(path);
-        } else if name.to_lowercase().ends_with(".exe") {
-            if app.imp {
-                app.name = path
-                    .file_stem()
-                    .map(|stem| stem.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                app.intro.clear();
-                app.pend = path;
-                app.stack.clear();
-                app.s = S::Dash;
-                app.modal = true;
-            } else if let Some(id) = app.current_id() {
-                app.set_startup_exe(id, path);
-                app.path = files_root();
-                app.back();
+            return;
+        }
+        match app.file_purpose {
+            crate::app::FilePurpose::Import => {
+                if name.to_lowercase().ends_with(".exe") {
+                    app.name = path
+                        .file_stem()
+                        .map(|stem| stem.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    app.intro.clear();
+                    app.pend = path;
+                    app.stack.clear();
+                    app.s = S::Dash;
+                    app.modal = true;
+                }
+            }
+            crate::app::FilePurpose::StartupExe => {
+                if name.to_lowercase().ends_with(".exe") {
+                    if let Some(id) = app.current_id() {
+                        app.set_startup_exe(id, path);
+                        app.path = files_root();
+                        app.back();
+                    }
+                }
+            }
+            crate::app::FilePurpose::CoverImage => {
+                let lower = name.to_lowercase();
+                if [".png", ".jpg", ".jpeg", ".webp", ".bmp"]
+                    .iter()
+                    .any(|ext| lower.ends_with(ext))
+                {
+                    app.pend = path;
+                    app.set_pending_cover();
+                    app.path = files_root();
+                    app.back();
+                }
+            }
+            crate::app::FilePurpose::BackupArchive => {
+                if name.to_lowercase().ends_with(".tar.gz") || name.to_lowercase().ends_with(".gz")
+                {
+                    app.pend = path;
+                    app.settings_notice = Some(format!("Selected backup {}", app.pend.display()));
+                    app.path = files_root();
+                    app.back();
+                }
             }
         }
     }

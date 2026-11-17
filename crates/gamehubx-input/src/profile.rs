@@ -23,6 +23,10 @@ pub enum ElementType {
     Stick,
     #[serde(rename = "RANGE_BUTTON")]
     RangeButton,
+    /// Relative trackpad: dragging emits mouse-move deltas scaled by
+    /// `cursor_speed`, matching the reference's `TRACKPAD` control element.
+    #[serde(rename = "TRACKPAD")]
+    Trackpad,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,9 +125,9 @@ impl Profile {
                 return Err(InputError::NoBindings);
             }
             let minimum = match element.kind {
-                ElementType::Button => 1,
+                ElementType::Button | ElementType::RangeButton => 1,
                 ElementType::DPad | ElementType::Stick => 4,
-                ElementType::RangeButton => 1,
+                ElementType::Trackpad => 2,
             };
             if element.bindings.len() < minimum {
                 return Err(InputError::TooFewBindings);

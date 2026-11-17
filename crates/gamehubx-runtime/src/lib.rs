@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod component;
 pub mod container;
 pub mod installer;
@@ -6,6 +7,7 @@ pub mod manifest;
 pub mod session;
 pub mod verify;
 
+pub use backup::{backup_container, restore_container, BackupError};
 pub use component::{apply_dxvk, merge_component, remove_component, MergeError};
 pub use container::{Container, ContainerError, ContainerManager, ContainerMetadata};
 pub use installer::{
@@ -15,7 +17,8 @@ pub use installer::{
 pub use layout::{is_within, RuntimeLayout};
 pub use manifest::{Component, ManifestError, RuntimeManifest};
 pub use session::{
-    AudioBackend, CommandSpec, DisplayPlan, SessionConfig, SessionError, SessionPlan,
+    session_settings_json, AudioBackend, CommandSpec, DisplayPlan, SessionConfig, SessionError,
+    SessionExtras, SessionPlan,
 };
 pub use verify::{sha256_hex, verify_file, verify_reader};
 

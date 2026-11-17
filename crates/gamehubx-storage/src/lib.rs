@@ -50,7 +50,27 @@ impl LibraryStore {
                  audio_backend TEXT NOT NULL,
                  touch_profile TEXT NOT NULL,
                  memory_limit_mb INTEGER NOT NULL DEFAULT 0,
-                 cpu_affinity_big INTEGER NOT NULL DEFAULT 0
+                 cpu_affinity_big INTEGER NOT NULL DEFAULT 0,
+                 container_language TEXT NOT NULL DEFAULT 'en_US',
+                 mangohud INTEGER NOT NULL DEFAULT 0,
+                 directx_hud TEXT NOT NULL DEFAULT 'Disable',
+                 disable_wm INTEGER NOT NULL DEFAULT 0,
+                 env_vars_json TEXT NOT NULL DEFAULT '[]',
+                 command_line TEXT NOT NULL DEFAULT '',
+                 auto_keyboard INTEGER NOT NULL DEFAULT 1,
+                 disable_gfx_plugin INTEGER NOT NULL DEFAULT 0,
+                 compat_layer TEXT NOT NULL DEFAULT 'proton10.0-arm64x-2',
+                 translation_params TEXT NOT NULL DEFAULT 'Game Presets',
+                 dinput_library TEXT NOT NULL DEFAULT 'Prefer Native',
+                 gpu_driver TEXT NOT NULL DEFAULT 'System Driver',
+                 surface_format TEXT NOT NULL DEFAULT 'RGBA8',
+                 vkd3d_version TEXT NOT NULL DEFAULT 'Default',
+                 log_server INTEGER NOT NULL DEFAULT 0,
+                 wine_debug_params TEXT NOT NULL DEFAULT '-all',
+                 cpu_core_limit INTEGER NOT NULL DEFAULT 0,
+                 overlay_opacity INTEGER NOT NULL DEFAULT 100,
+                 rts_gestures INTEGER NOT NULL DEFAULT 0,
+                 config_preset TEXT NOT NULL DEFAULT 'Balanced'
              );
              CREATE TABLE IF NOT EXISTS downloads (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +100,32 @@ impl LibraryStore {
         if !has_column(&conn, "game_settings", "cpu_affinity_big")? {
             conn.execute_batch(
                 "ALTER TABLE game_settings ADD COLUMN cpu_affinity_big INTEGER NOT NULL DEFAULT 0;",
+            )?;
+        }
+        // Extended per-game settings migration. Guard on a sentinel column so
+        // an old database gains every new column exactly once.
+        if !has_column(&conn, "game_settings", "container_language")? {
+            conn.execute_batch(
+                "ALTER TABLE game_settings ADD COLUMN container_language TEXT NOT NULL DEFAULT 'en_US';
+                 ALTER TABLE game_settings ADD COLUMN mangohud INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN directx_hud TEXT NOT NULL DEFAULT 'Disable';
+                 ALTER TABLE game_settings ADD COLUMN disable_wm INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN env_vars_json TEXT NOT NULL DEFAULT '[]';
+                 ALTER TABLE game_settings ADD COLUMN command_line TEXT NOT NULL DEFAULT '';
+                 ALTER TABLE game_settings ADD COLUMN auto_keyboard INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE game_settings ADD COLUMN disable_gfx_plugin INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN compat_layer TEXT NOT NULL DEFAULT 'proton10.0-arm64x-2';
+                 ALTER TABLE game_settings ADD COLUMN translation_params TEXT NOT NULL DEFAULT 'Game Presets';
+                 ALTER TABLE game_settings ADD COLUMN dinput_library TEXT NOT NULL DEFAULT 'Prefer Native';
+                 ALTER TABLE game_settings ADD COLUMN gpu_driver TEXT NOT NULL DEFAULT 'System Driver';
+                 ALTER TABLE game_settings ADD COLUMN surface_format TEXT NOT NULL DEFAULT 'RGBA8';
+                 ALTER TABLE game_settings ADD COLUMN vkd3d_version TEXT NOT NULL DEFAULT 'Default';
+                 ALTER TABLE game_settings ADD COLUMN log_server INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN wine_debug_params TEXT NOT NULL DEFAULT '-all';
+                 ALTER TABLE game_settings ADD COLUMN cpu_core_limit INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN overlay_opacity INTEGER NOT NULL DEFAULT 100;
+                 ALTER TABLE game_settings ADD COLUMN rts_gestures INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE game_settings ADD COLUMN config_preset TEXT NOT NULL DEFAULT 'Balanced';",
             )?;
         }
         Ok(Self { conn })
@@ -159,14 +205,32 @@ impl LibraryStore {
         Ok(changed > 0)
     }
 
+    pub fn set_cover(&self, id: GameId, cover: Option<&Path>) -> rusqlite::Result<bool> {
+        let changed = self.conn.execute(
+            "UPDATE games SET cover_path = ?1 WHERE id = ?2",
+            params![
+                cover.map(|path| path.to_string_lossy().to_string()),
+                id.0 as i64
+            ],
+        )?;
+        Ok(changed > 0)
+    }
+
     pub fn settings(&self, id: GameId) -> rusqlite::Result<GameSettings> {
         self.conn
             .query_row(
                 "SELECT width, height, fps_cap, dxvk_version, audio_backend, touch_profile,
-                        memory_limit_mb, cpu_affinity_big
+                        memory_limit_mb, cpu_affinity_big, container_language, mangohud,
+                        directx_hud, disable_wm, env_vars_json, command_line, auto_keyboard,
+                        disable_gfx_plugin, compat_layer, translation_params, dinput_library,
+                        gpu_driver, surface_format, vkd3d_version, log_server, wine_debug_params,
+                        cpu_core_limit, overlay_opacity, rts_gestures, config_preset
                  FROM game_settings WHERE game_id = ?1",
                 [id.0 as i64],
                 |row| {
+                    let env_json: String = row.get(12)?;
+                    let env_vars = serde_json::from_str::<Vec<(String, String)>>(&env_json)
+                        .unwrap_or_default();
                     Ok(GameSettings {
                         width: row.get::<_, i64>(0)? as u32,
                         height: row.get::<_, i64>(1)? as u32,
@@ -176,6 +240,26 @@ impl LibraryStore {
                         touch_profile: row.get(5)?,
                         memory_limit_mb: row.get::<_, i64>(6)? as u32,
                         cpu_affinity_big: row.get::<_, i64>(7)? != 0,
+                        container_language: row.get(8)?,
+                        mangohud: row.get::<_, i64>(9)? != 0,
+                        directx_hud: row.get(10)?,
+                        disable_wm: row.get::<_, i64>(11)? != 0,
+                        env_vars,
+                        command_line: row.get(13)?,
+                        auto_keyboard: row.get::<_, i64>(14)? != 0,
+                        disable_gfx_plugin: row.get::<_, i64>(15)? != 0,
+                        compat_layer: row.get(16)?,
+                        translation_params: row.get(17)?,
+                        dinput_library: row.get(18)?,
+                        gpu_driver: row.get(19)?,
+                        surface_format: row.get(20)?,
+                        vkd3d_version: row.get(21)?,
+                        log_server: row.get::<_, i64>(22)? != 0,
+                        wine_debug_params: row.get(23)?,
+                        cpu_core_limit: row.get::<_, i64>(24)? as u32,
+                        overlay_opacity: row.get::<_, i64>(25)? as u8,
+                        rts_gestures: row.get::<_, i64>(26)? != 0,
+                        config_preset: row.get(27)?,
                     })
                 },
             )
@@ -184,11 +268,17 @@ impl LibraryStore {
     }
 
     pub fn save_settings(&self, id: GameId, settings: &GameSettings) -> rusqlite::Result<()> {
+        let env_json = serde_json::to_string(&settings.env_vars).unwrap_or_else(|_| "[]".into());
         self.conn.execute(
             "INSERT INTO game_settings
                  (game_id, width, height, fps_cap, dxvk_version, audio_backend, touch_profile,
-                  memory_limit_mb, cpu_affinity_big)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                  memory_limit_mb, cpu_affinity_big, container_language, mangohud, directx_hud,
+                  disable_wm, env_vars_json, command_line, auto_keyboard, disable_gfx_plugin,
+                  compat_layer, translation_params, dinput_library, gpu_driver, surface_format,
+                  vkd3d_version, log_server, wine_debug_params, cpu_core_limit, overlay_opacity,
+                  rts_gestures, config_preset)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+                     ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)
              ON CONFLICT(game_id) DO UPDATE SET
                  width = excluded.width,
                  height = excluded.height,
@@ -197,7 +287,27 @@ impl LibraryStore {
                  audio_backend = excluded.audio_backend,
                  touch_profile = excluded.touch_profile,
                  memory_limit_mb = excluded.memory_limit_mb,
-                 cpu_affinity_big = excluded.cpu_affinity_big",
+                 cpu_affinity_big = excluded.cpu_affinity_big,
+                 container_language = excluded.container_language,
+                 mangohud = excluded.mangohud,
+                 directx_hud = excluded.directx_hud,
+                 disable_wm = excluded.disable_wm,
+                 env_vars_json = excluded.env_vars_json,
+                 command_line = excluded.command_line,
+                 auto_keyboard = excluded.auto_keyboard,
+                 disable_gfx_plugin = excluded.disable_gfx_plugin,
+                 compat_layer = excluded.compat_layer,
+                 translation_params = excluded.translation_params,
+                 dinput_library = excluded.dinput_library,
+                 gpu_driver = excluded.gpu_driver,
+                 surface_format = excluded.surface_format,
+                 vkd3d_version = excluded.vkd3d_version,
+                 log_server = excluded.log_server,
+                 wine_debug_params = excluded.wine_debug_params,
+                 cpu_core_limit = excluded.cpu_core_limit,
+                 overlay_opacity = excluded.overlay_opacity,
+                 rts_gestures = excluded.rts_gestures,
+                 config_preset = excluded.config_preset",
             params![
                 id.0 as i64,
                 settings.width as i64,
@@ -208,6 +318,26 @@ impl LibraryStore {
                 settings.touch_profile,
                 settings.memory_limit_mb as i64,
                 settings.cpu_affinity_big as i64,
+                settings.container_language,
+                settings.mangohud as i64,
+                settings.directx_hud,
+                settings.disable_wm as i64,
+                env_json,
+                settings.command_line,
+                settings.auto_keyboard as i64,
+                settings.disable_gfx_plugin as i64,
+                settings.compat_layer,
+                settings.translation_params,
+                settings.dinput_library,
+                settings.gpu_driver,
+                settings.surface_format,
+                settings.vkd3d_version,
+                settings.log_server as i64,
+                settings.wine_debug_params,
+                settings.cpu_core_limit as i64,
+                settings.overlay_opacity as i64,
+                settings.rts_gestures as i64,
+                settings.config_preset,
             ],
         )?;
         Ok(())
@@ -533,6 +663,26 @@ mod tests {
             touch_profile: "Keyboard & Mouse".into(),
             memory_limit_mb: 4096,
             cpu_affinity_big: true,
+            container_language: "ja_JP".into(),
+            mangohud: true,
+            directx_hud: "Full".into(),
+            disable_wm: true,
+            env_vars: vec![("LIBGL_ALWAYS_SOFTWARE".into(), "1".into())],
+            command_line: "-windowed".into(),
+            auto_keyboard: false,
+            disable_gfx_plugin: true,
+            compat_layer: "wine10.0-arm64ec".into(),
+            translation_params: "Box64 Optimized".into(),
+            dinput_library: "Prefer Wine".into(),
+            gpu_driver: "Turnip".into(),
+            surface_format: "BGRA8".into(),
+            vkd3d_version: "VKD3D".into(),
+            log_server: true,
+            wine_debug_params: "fixme-all".into(),
+            cpu_core_limit: 4,
+            overlay_opacity: 80,
+            rts_gestures: true,
+            config_preset: "Performance".into(),
         };
         store.save_settings(id, &settings).unwrap();
         assert_eq!(store.settings(id).unwrap(), settings);

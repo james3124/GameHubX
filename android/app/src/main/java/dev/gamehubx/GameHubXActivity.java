@@ -9,6 +9,8 @@ public final class GameHubXActivity extends NativeActivity {
     private static final java.util.concurrent.ConcurrentLinkedQueue<Integer> GAMEPAD_ACTIONS =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
 
+    private String pendingShortcutExe;
+
     static {
         System.loadLibrary("gamehubx_app");
     }
@@ -19,6 +21,10 @@ public final class GameHubXActivity extends NativeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         nativeSetFilesDir(getFilesDir().getAbsolutePath());
+        String shortcutExe = getIntent().getStringExtra("pin_launch_exe");
+        if (shortcutExe != null) {
+            pendingShortcutExe = shortcutExe;
+        }
         super.onCreate(savedInstanceState);
         Log.i(TAG, "activity created");
     }
@@ -59,7 +65,20 @@ public final class GameHubXActivity extends NativeActivity {
         WinlatorLauncher.openMain(this);
     }
 
-    public String launchWinlator(String exePath, String gameName) {
+    public boolean addHomeShortcut(String exePath, String label) {
+        return HomeShortcut.pin(this, exePath, label);
+    }
+
+    public String consumeShortcutExe() {
+        String exe = pendingShortcutExe;
+        pendingShortcutExe = null;
+        return exe;
+    }
+
+    public String launchWinlator(String exePath, String gameName, String settingsJson) {
+        // Keep the settings on the bridge so the post-download launch path
+        // (RuntimeAssetsActivity) can reuse them without re-crossing JNI.
+        dev.gamehubx.session.WinlatorBridge.setSettings(settingsJson);
         if (!RuntimeAssetsActivity.isReady(this)) {
             android.content.Intent intent = new android.content.Intent(this, RuntimeAssetsActivity.class);
             intent.putExtra("auto_start", true);

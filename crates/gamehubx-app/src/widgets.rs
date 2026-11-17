@@ -169,19 +169,19 @@ pub(crate) fn row(ui: &mut Ui, t: &str, d: &str, v: &str) -> Response {
     r
 }
 
-pub(crate) fn tog(ui: &mut Ui, t: &str, d: &str, on: &mut bool) {
+/// Render a toggle row. Returns true when it was clicked (the caller flips the
+/// backing value and persists it). `on` only controls the visual state.
+pub(crate) fn tog(ui: &mut Ui, t: &str, d: &str, on: bool) -> bool {
     let r = row(ui, t, d, "");
     let c = r.rect.right_center() - vec2(50.0, 0.0);
     ui.painter().rect_filled(
         Rect::from_center_size(c, vec2(68.0, 34.0)),
         17.0,
-        if *on { ACC } else { Color32::from_gray(60) },
+        if on { ACC } else { Color32::from_gray(60) },
     );
     ui.painter()
-        .circle_filled(c + vec2(if *on { 17.0 } else { -17.0 }, 0.0), 13.0, W);
-    if r.clicked() {
-        *on = !*on;
-    }
+        .circle_filled(c + vec2(if on { 17.0 } else { -17.0 }, 0.0), 13.0, W);
+    r.clicked()
 }
 
 pub(crate) fn short(s: &str) -> String {

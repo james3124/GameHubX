@@ -149,6 +149,31 @@ Limits:
   shortcuts yet (W4).
 - No on-device run; the first CI APK and a real container launch are pending.
 
+## W4 progress (2026-11-17)
+
+Done (launcher-side mapping; device verification still pending):
+
+- The launcher serializes its per-game settings into a settings JSON
+  (`gamehubx_runtime::session_settings_json`) and passes it through JNI:
+  `launchWinlator(exe, name, settingsJson)` → `WinlatorBridge.setSettings(...)`.
+- `WinlatorBridge` now applies those settings to the first Winlator container
+  before launch and saves it: resolution → `screenSize`, FPS cap → `DXVK_FRAME_RATE`,
+  DXVK/VKD3D → `dxwrapper`, audio backend → Winlator's `pulse-audio-gn`/`alsa-oboe`,
+  MangoHUD/DirectX-HUD/WINEDEBUG/WM/core-limit + custom `env_vars` merged into the
+  container env; command-line args are appended to the `.desktop` shortcut `Exec`.
+- The settings are cached on the bridge so the post-asset-download launch path
+  (`RuntimeAssetsActivity`) reuses them without re-crossing JNI.
+- Trimmed ~10 MB of never-built native sources from the vendored tree
+  (`OpenXR-SDK`, `xr`, `proot`, `virglrenderer`, `ludashi-steam-*`, `steam_optional.c`);
+  see `thirdparty/winlator/VENDORED.md`. Java/Kotlin, resources, manifest, jniLibs
+  and the CMake build targets are untouched.
+
+Limits:
+
+- Still reuses the first Winlator container (no per-game containers yet).
+- Live touch/HUD injection into the X server remains the G2/display-bridge gate.
+- No on-device run; the Android/JNI changes are not compiled by the host CI gate.
+
 ## Risks
 
 - Vendoring a full Android app is large; build integration (Compose/AndroidX,

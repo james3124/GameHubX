@@ -1,5 +1,5 @@
 use eframe::egui::*;
-use gamehubx_platform::format_bytes;
+use gamehubx_platform::{files_root, format_bytes, scan_storage_categories};
 
 use crate::app::App;
 use crate::theme::{ACC, DIM};
@@ -55,6 +55,30 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
                     ui.label(RichText::new(text).size(24.0));
                 }
             });
+
+            // Per-category breakdown mirroring the reference Game/Media/Other
+            // legend (computed on demand with a bounded, symlink-safe scan).
+            ui.add_space(18.0);
+            let categories = scan_storage_categories(&files_root());
+            ui.label(RichText::new("Storage by category").size(24.0).strong());
+            for (color, label, bytes) in [
+                (
+                    Color32::from_rgb(59, 130, 246),
+                    "Game",
+                    categories.game_bytes,
+                ),
+                (
+                    Color32::from_rgb(140, 147, 168),
+                    "Media",
+                    categories.media_bytes,
+                ),
+                (Color32::from_gray(70), "Other", categories.other_bytes),
+            ] {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("●").color(color));
+                    ui.label(RichText::new(format!("{label} {}", format_bytes(bytes))).size(22.0));
+                });
+            }
         });
     });
 }
