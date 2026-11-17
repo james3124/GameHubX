@@ -1083,7 +1083,6 @@ impl App {
             return;
         };
         let label = game.label.clone();
-        let id = game.id;
         let exe = game.exe.clone();
         self.session_game = label.clone();
 
@@ -1096,7 +1095,7 @@ impl App {
         #[cfg(target_os = "android")]
         {
             let exe_text = exe.to_string_lossy();
-            let settings_json = gamehubx_runtime::session_settings_json(&settings);
+            let settings_json = gamehubx_runtime::session_settings_json(&self.game_settings);
             match gamehubx_platform::launch_winlator_game(exe_text.as_ref(), &label, &settings_json)
             {
                 Ok(()) => {
@@ -1153,7 +1152,7 @@ impl App {
         };
         let config = SessionConfig {
             layout: RuntimeLayout::new(data.join("runtime")),
-            container: data.join("containers").join(format!("{:016x}", id.0)),
+            container: data.join("containers").join(format!("{:016x}", game.id.0)),
             game_dir,
             exe,
             fps_cap: settings.fps_cap,
@@ -1188,7 +1187,7 @@ impl App {
                 plan.config().layout.wine().display().to_string(),
                 "open",
             );
-            let _ = manager.repair(id, metadata);
+            let _ = manager.repair(game.id, metadata);
         }
 
         let layout = plan.config().layout.clone();
